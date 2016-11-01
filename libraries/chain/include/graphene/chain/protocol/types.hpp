@@ -155,7 +155,8 @@ namespace graphene { namespace chain {
       impl_budget_record_object_type,
       impl_special_authority_object_type,
       impl_buyback_object_type,
-      impl_fba_accumulator_object_type
+      impl_fba_accumulator_object_type,
+      impl_sj_note_object_type
    };
 
    //typedef fc::unsigned_int            object_id_type;
