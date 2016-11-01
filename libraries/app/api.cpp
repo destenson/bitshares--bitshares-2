@@ -362,6 +362,8 @@ namespace graphene { namespace app {
                   break;
                  case impl_fba_accumulator_object_type:
                   break;
+                 case impl_sj_note_object_type:
+                  break;
           }
        }
        return result;
