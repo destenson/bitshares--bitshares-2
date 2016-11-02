@@ -362,6 +362,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_special_authority_object_type)
                  (impl_buyback_object_type)
                  (impl_fba_accumulator_object_type)
+                 (impl_sj_note_object_type)
                )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )

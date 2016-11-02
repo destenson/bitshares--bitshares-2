@@ -164,7 +164,7 @@ struct sign_state
 
       /**
        *  Checks to see if we have signatures of the active authorites of
-       *  the accounts specified in authority or the keys specified. 
+       *  the accounts simpl_fba_accumulator_object_typepecified in authority or the keys specified.
        */
       bool check_authority( const authority* au, uint32_t depth = 0 )
       {
@@ -224,7 +224,7 @@ struct sign_state
          return remove_sigs.size() != 0;
       }
 
-      sign_state( const flat_set<pfba_distribute_operationublic_key_type>& sigs,
+      sign_state( const flat_set<public_key_type>& sigs,
                   const std::function<const authority*(account_id_type)>& a,
                   const flat_set<public_key_type>& keys = flat_set<public_key_type>() )
       :get_active(a),available_keys(keys)
