@@ -256,7 +256,54 @@ struct blind_transfer_operation : public base_operation
    }
 };
 
-///@} endgroup stealth
+
+///@} ;;endgroup stealth
+
+typedef fc::uint256 spending_key_type;
+
+struct stealth_note
+{
+    fc::uint256 paying_key;
+    asset amount;
+    fc::uint256 nullifier_base;
+    fc::uint256 trapdoor;
+
+    fc::uint256 commitment() const;
+    fc::uint256 nullifier(const spending_key_type& a_sk) const;
+};
+
+struct stealth_input
+{
+    stealth_note note;
+    optional<spending_key_type> spending_key;
+
+    fc::uint256 nullifier() const;
+};
+
+struct stealth_output
+{
+    stealth_note note;
+};
+
+struct transfer_to_stealth_operation :public base_operation
+{
+
+};
+
+struct stealth_transfer_operation : public base_operation
+{
+   asset        fee;
+
+   stealth_note note;
+   uint256_t stealth_nullifier;
+
+   /** graphene TEMP account */
+   account_id_type fee_payer()const;
+   void            validate()const;
+   share_type      calculate_fee()const;
+};
+
+
 
 } } // graphene::chain
 
