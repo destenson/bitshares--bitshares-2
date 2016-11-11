@@ -196,3 +196,6 @@ struct stealth_transfer_operation : public base_operation
 };
 
 }}
+
+FC_REFLECT( graphene::chain::stealth_payment_address,
+            (paying_key)(transmission_key) )
