@@ -77,8 +77,8 @@ struct stealth_note_decryption
     stealth_note_decryption(fc::uint256 secret_key);
 
     binary decrypt(const binary &ciphertext,
-                      const uint256 &ephemeral_public_key,
-                      const uint256 &h_sig,
+                      const fc::uint256 &ephemeral_public_key,
+                      const fc::uint256 &h_sig,
                       unsigned char nonce
                      ) const;
 };
@@ -197,5 +197,6 @@ struct stealth_transfer_operation : public base_operation
 
 }}
 
-FC_REFLECT( graphene::chain::stealth_payment_address,
-            (paying_key)(transmission_key) )
+FC_REFLECT( graphene::chain::stealth_payment_address, (paying_key)(transmission_key) );
+FC_REFLECT( graphene::chain::stealth_viewing_key, (value));
+FC_REFLECT( graphene::chain::stealth_spending_key, (value));

@@ -31,5 +31,28 @@ fc::uint256 stealth_payment_address::hash() const
     return fc::sha256::hash(fc::raw::pack( *this ));
 }
 
+fc::uint256 stealth_viewing_key::transmission_key() const
+{
+    return stealth_note_encryption::generate_public_key(*this);
+}
+
+stealth_spending_key stealth_spending_key::random()
+{
+    return stealth_spending_key({});
+}
+
+stealth_viewing_key stealth_spending_key::viewing_key() const
+{
+    return stealth_viewing_key(
+        {stealth_note_encryption::generate_secret_key(*this)}
+                );
+}
+
+stealth_payment_address stealth_spending_key::address() const
+{
+
+}
+
+
 }}
 
