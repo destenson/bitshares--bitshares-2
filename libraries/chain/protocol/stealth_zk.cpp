@@ -145,6 +145,17 @@ stealth_note::stealth_note():
 
 }
 
+stealth_note::stealth_note(const fc::uint256 &p_k,
+                           const asset &a, const fc::uint256 &n_b,
+                           const fc::uint256 &t):
+    paying_key(p_k),
+    amount(a),
+    nullifier_base(n_b),
+    trapdoor(t)
+{
+
+}
+
 fc::uint256 stealth_note::commitment() const
 {
     return fc::sha256::hash(fc::raw::pack( *this ));
@@ -153,6 +164,47 @@ fc::uint256 stealth_note::commitment() const
 fc::uint256 stealth_note::nullifier(const stealth_spending_key &a_sk) const
 {
     return PRF_nf(a_sk.value, nullifier_base);
+}
+
+
+
+
+
+stealth_note_plaintext::stealth_note_plaintext()
+{
+}
+
+stealth_note_plaintext::stealth_note_plaintext(const stealth_note &note,
+                                               const binary &m):
+    amount(note.amount),
+    nullifier_base(note.nullifier_base),
+    trapdoor(note.trapdoor),
+    memo(m)
+{
+
+}
+
+stealth_note stealth_note_plaintext::note(
+        const stealth_payment_address &address) const
+{
+    return stealth_note(address.paying_key, amount, nullifier_base,
+                         trapdoor);
+}
+
+stealth_note_plaintext stealth_note_plaintext::decrypt(
+        const stealth_note_decryption &decryptor, const binary &ciphertext,
+        const fc::uint256 &ephemeral_key, const fc::uint256 &h_sig,
+        unsigned char nonce)
+{
+    auto plaintext = decryptor.decrypt(ciphertext, ephemeral_key, h_sig,
+                                       nonce);
+    return fc::raw::unpack<stealth_note_plaintext>(plaintext);
+}
+
+binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
+                                       const fc::uint256 &transmission_key) const
+{
+    return encryptor.encrypt(transmission_key, fc::raw::pack(*this));
 }
 
 

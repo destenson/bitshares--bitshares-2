@@ -61,14 +61,16 @@ struct stealth_note
     fc::uint256 trapdoor;
 
     stealth_note();
+    stealth_note(const fc::uint256& p_k, const asset& a,
+                 const fc::uint256& n_b, const fc::uint256& t);
+
     fc::uint256 commitment() const;
     fc::uint256 nullifier(const stealth_spending_key& a_sk) const;
 };
 
 
 #define STEALTH_MEMO_SIZE 256
-typedef boost::array<unsigned char, STEALTH_MEMO_SIZE> stealth_memo;
-typedef std::vector<unsigned char> binary;
+typedef std::vector<char> binary;
 
 struct stealth_note_decryption
 {
@@ -105,9 +107,10 @@ struct stealth_note_plaintext
     asset amount;
     fc::uint256 nullifier_base;
     fc::uint256 trapdoor;
-    stealth_memo memo;
+    binary memo;
 
-    stealth_note_plaintext(const stealth_note& note, const stealth_memo& memo);
+    stealth_note_plaintext();
+    stealth_note_plaintext(const stealth_note& note, const binary& memo);
 
     stealth_note note(const stealth_payment_address& address) const;
 
@@ -135,7 +138,7 @@ struct stealth_output
 {
     stealth_payment_address address;
     asset value;
-    stealth_memo memo;
+    binary memo;
 
     stealth_note note(const fc::uint256& nullifier_base,
                       const fc::uint256& trapdoor, size_t i,
@@ -202,3 +205,4 @@ FC_REFLECT( graphene::chain::stealth_payment_address, (paying_key)(transmission_
 FC_REFLECT( graphene::chain::stealth_viewing_key, (value));
 FC_REFLECT( graphene::chain::stealth_spending_key, (value));
 FC_REFLECT( graphene::chain::stealth_note, (paying_key)(amount)(nullifier_base)(trapdoor));
+FC_REFLECT( graphene::chain::stealth_note_plaintext, (amount)(nullifier_base)(trapdoor)(memo));
