@@ -209,5 +209,13 @@ binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
 
 
 
+
+fc::uint256 stealth_input::nullifier() const
+{
+    return note.nullifier(spending_key);
+}
+
+
+
 }}
 
