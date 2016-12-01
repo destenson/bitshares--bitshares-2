@@ -209,8 +209,12 @@ binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
 // Note encryption/decryption
 //////////////////////////////////////////////////////////////////
 
-#define NOTEENCRYPTION_CIPHER_KEYSIZE 32
-
+void clamp_curve25519(fc::uint256 key)
+{
+    key.data()[0] &= 248;
+    key.data()[31] &= 127;
+    key.data()[31] |= 64;
+}
 
 fc::uint256 KDF(
     const fc::uint256 &dhsecret,
@@ -271,19 +275,29 @@ binary stealth_note_encryption::encrypt(const fc::uint256 &encryption_public_key
 
     fc::blowfish bf;
     bf.start(reinterpret_cast<unsigned char*>(K.data()), K.data_size());
-    bf.encrypt(reinterpret_cast<unsigned char*>(ciphertext.data()), ciphertext.size());
+    bf.encrypt(reinterpret_cast<unsigned char*>(ciphertext.data()),
+               ciphertext.size());
 
     return ciphertext;
 }
 
-fc::uint256 stealth_note_encryption::generate_secret_key(const stealth_spending_key &paying_key)
+fc::uint256 stealth_note_encryption::generate_secret_key(
+        const stealth_spending_key &paying_key)
 {
-
+    fc::uint256 sk = PRF_addr_sk_enc(paying_key.value);
+    clamp_curve25519(sk);
+    return sk;
 }
 
-fc::uint256 stealth_note_encryption::generate_public_key(const fc::uint256 &secret_key)
+fc::uint256 stealth_note_encryption::generate_public_key(
+        const fc::uint256 &secret_key)
 {
+    fc::diffie_hellman dh;
+    dh.priv_key.assign(secret_key.data(), secret_key.data() +
+                       secret_key.data_size());
+    dh.generate_pub_key();
 
+    return fc::uint256(dh.pub_key.data(), dh.pub_key.size());
 }
 
 
