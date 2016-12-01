@@ -253,7 +253,6 @@ stealth_note_encryption::stealth_note_encryption(fc::uint256 sig) :
 binary stealth_note_encryption::encrypt(const fc::uint256 &encryption_public_key,
                                         const binary &plaintext)
 {
-
     fc::diffie_hellman dh;
     dh.priv_key.assign(ephemeral_secret_key.data(),
                        ephemeral_secret_key.data() +
@@ -307,9 +306,37 @@ stealth_note_decryption::stealth_note_decryption(fc::uint256 s_k):
     public_key = stealth_note_encryption::generate_public_key(secret_key);
 }
 
-binary stealth_note_decryption::decrypt(const binary &ciphertext, const fc::uint256 &ephemeral_public_key, const fc::uint256 &h_sig, unsigned char nonce) const
+binary stealth_note_decryption::decrypt(const binary &ciphertext,
+                                        const fc::uint256 &ephemeral_public_key,
+                                        const fc::uint256 &h_sig,
+                                        unsigned char nonce) const
 {
+    fc::diffie_hellman dh;
+    dh.priv_key.assign(secret_key.data(),
+                       secret_key.data() +
+                       secret_key.data_size());
+    dh.generate_pub_key();
+    dh.compute_shared_key(ephemeral_public_key.data(),
+                          ephemeral_public_key.data_size());
+    fc::uint256 dhsecret(&dh.shared_key[0],
+            dh.shared_key.size()); // TODO: check if it is correct
 
+    // Construct the symmetric key
+    fc::uint256 K = KDF(dhsecret, ephemeral_public_key,
+                       public_key,
+        h_sig, nonce);
+
+    // Increment the number of encryptions we've performed
+    nonce++;
+
+    binary plaintext(ciphertext);
+
+    fc::blowfish bf;
+    bf.start(reinterpret_cast<unsigned char*>(K.data()), K.data_size());
+    bf.decrypt(reinterpret_cast<unsigned char*>(plaintext.data()),
+               plaintext.size());
+
+    return plaintext;
 }
 
 fc::uint256 stealth_input::nullifier() const
