@@ -34,27 +34,29 @@
 
 using namespace graphene::chain;
 
-BOOST_FIXTURE_TEST_SUITE( stealth_tests, database_fixture )
+//BOOST_FIXTURE_TEST_SUITE( stealth_tests, database_fixture )
+
 BOOST_AUTO_TEST_CASE( stealth_test )
 { try {
 
-        fc::uint256 sk_enc = 
-                stealth_note_encryption::generate_secret_key(uint256("21035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a07")));
+        stealth_spending_key paying_key({fc::uint256("21035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a07")});
+        fc::uint256 sk_enc =
+                stealth_note_encryption::generate_secret_key(paying_key);
         fc::uint256 pk_enc = 
                 stealth_note_encryption::generate_public_key(sk_enc);
     
-        stealth_note_encryption b;
+        stealth_note_encryption b = stealth_note_encryption(fc::uint256());
         for (size_t i = 0; i < 100; i++)
         {
-            stealth_note_encryption c;
+            stealth_note_encryption c = stealth_note_encryption(fc::uint256());
     
-            BOOST_REQUIRE(b.ephemeral_public_key != c.ephemeral_public_key, "the same default keys");
+            BOOST_REQUIRE(b.ephemeral_public_key != c.ephemeral_public_key);
         }
     
-        boost::array<unsigned char, 32> message;
-        for (size_t i = 0; i < 32; i++) {
+        binary message;
+        for (unsigned char i = 0; i < 32; i++) {
             // Fill the message with dummy data
-            message[i] = (unsigned char) i;
+            message.push_back(i);
         }
     
         for (int i = 0; i < 255; i++) {
@@ -66,7 +68,7 @@ BOOST_AUTO_TEST_CASE( stealth_test )
                 // Test decryption
                 auto plaintext = decrypter.decrypt(ciphertext, b.ephemeral_public_key,
                                                    fc::uint256(), i);
-                BOOST_REQUIRE(plaintext == message, "incorrect decrypt");
+                BOOST_REQUIRE(plaintext == message);
     
                 // Test wrong nonce
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
@@ -75,7 +77,7 @@ BOOST_AUTO_TEST_CASE( stealth_test )
             
                 // Test wrong ephemeral key
                 {
-                    stealth_note_encryption c;
+                    stealth_note_encryption c = stealth_note_encryption(fc::uint256());
     
                     BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext,
                                                           c.ephemeral_public_key,
@@ -84,7 +86,7 @@ BOOST_AUTO_TEST_CASE( stealth_test )
             
                 // Test wrong seed
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                      fc::uint256S("11035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a77"), i),
+                                                      fc::uint256("11035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a77"), i),
                                     std::runtime_error);
             
                 // Test corrupted ciphertext
@@ -97,7 +99,8 @@ BOOST_AUTO_TEST_CASE( stealth_test )
     
             {
                 // Test wrong private key
-                fc::uint256 sk_enc_2 = stealth_note_encryption::generate_privkey(uint252());
+                stealth_spending_key paying_key2({fc::uint256()});
+                fc::uint256 sk_enc_2 = stealth_note_encryption::generate_secret_key(paying_key2);
                 stealth_note_decryption decrypter(sk_enc_2);
     
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
@@ -110,7 +113,5 @@ BOOST_AUTO_TEST_CASE( stealth_test )
         
 } FC_LOG_AND_RETHROW() }
 
-
-
-BOOST_AUTO_TEST_SUITE_END()
+//BOOST_AUTO_TEST_SUITE_END()
 
