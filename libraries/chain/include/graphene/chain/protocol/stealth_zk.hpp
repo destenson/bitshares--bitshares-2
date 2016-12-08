@@ -24,6 +24,7 @@
 
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
+#include <fc/crypto/elliptic.hpp>
 #include <boost/array.hpp>
 
 namespace graphene { namespace chain {

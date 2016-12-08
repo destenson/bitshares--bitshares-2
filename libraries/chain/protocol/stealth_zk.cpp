@@ -26,6 +26,7 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/dh.hpp>
 #include <fc/crypto/blowfish.hpp>
+
 #include <array>
 
 namespace graphene { namespace chain {
@@ -295,6 +296,10 @@ fc::uint256 stealth_note_encryption::generate_public_key(
     dh.priv_key.assign(secret_key.data(), secret_key.data() +
                        secret_key.data_size());
     dh.generate_pub_key();
+
+    ilog("D_H generated pub key size ${size}", ("size", dh.pub_key.size()));
+
+    FC_ASSERT(dh.pub_key.size() == 32, "D_H generated pub key size shuld be 32");
 
     return fc::uint256(dh.pub_key.data(), dh.pub_key.size());
 }

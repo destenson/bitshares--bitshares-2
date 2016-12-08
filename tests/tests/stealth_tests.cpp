@@ -30,7 +30,8 @@
 
 #include <graphene/chain/protocol/stealth_zk.hpp>
 #include <fc/crypto/sha256.hpp>
-#include "../common/database_fixture.hpp"
+//#include "../common/database_fixture.hpp"
+#include <iostream>
 
 using namespace graphene::chain;
 
@@ -38,13 +39,13 @@ using namespace graphene::chain;
 
 BOOST_AUTO_TEST_CASE( stealth_test )
 { try {
-
-        stealth_spending_key paying_key({fc::uint256("21035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a07")});
+        fc::uint256 num("21035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a07");
+        stealth_spending_key paying_key({num});
         fc::uint256 sk_enc =
                 stealth_note_encryption::generate_secret_key(paying_key);
-        fc::uint256 pk_enc = 
+        fc::uint256 pk_enc =
                 stealth_note_encryption::generate_public_key(sk_enc);
-    
+
         stealth_note_encryption b = stealth_note_encryption(fc::uint256());
         for (size_t i = 0; i < 100; i++)
         {
@@ -110,7 +111,7 @@ BOOST_AUTO_TEST_CASE( stealth_test )
     
         }
 
-        
+
 } FC_LOG_AND_RETHROW() }
 
 //BOOST_AUTO_TEST_SUITE_END()
