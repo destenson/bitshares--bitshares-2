@@ -29,24 +29,31 @@
 
 namespace graphene { namespace chain {
 
+#define STEALTH_MEMO_SIZE 256
+typedef std::vector<char> binary;
+
+fc::uint256 random_uint256();
+binary random_binary(size_t size);
+
+
 struct stealth_payment_address
 {
     fc::uint256 paying_key;
-    fc::uint256 transmission_key;
+    fc::ecc::public_key transmission_key;
 
     fc::uint256 hash() const;
 };
 
 struct stealth_viewing_key
 {
-    fc::uint256 value;
+    fc::ecc::private_key value;
 
-    fc::uint256 transmission_key() const;
+    fc::ecc::public_key transmission_key() const;
 };
 
 struct stealth_spending_key
 {
-    fc::uint256 value;
+    fc::ecc::private_key value;
 
     static stealth_spending_key random();
 
@@ -70,37 +77,34 @@ struct stealth_note
 };
 
 
-#define STEALTH_MEMO_SIZE 256
-typedef std::vector<char> binary;
-
 struct stealth_note_decryption
 {
-    fc::uint256 secret_key;
-    fc::uint256 public_key;
+    fc::ecc::private_key secret_key;
+    fc::ecc::public_key public_key;
 
-    stealth_note_decryption(fc::uint256 secret_key);
+    stealth_note_decryption(fc::ecc::private_key secret_key);
 
     binary decrypt(const binary &ciphertext,
-                      const fc::uint256 &ephemeral_public_key,
-                      const fc::uint256 &h_sig,
+                      const fc::ecc::public_key &ephemeral_public_key,
+                      const binary &h_sig,
                       unsigned char nonce
                      ) const;
 };
 
 struct stealth_note_encryption
 {
-    fc::uint256 ephemeral_public_key;
-    fc::uint256 ephemeral_secret_key;
+    fc::ecc::public_key ephemeral_public_key;
+    fc::ecc::private_key ephemeral_secret_key;
     unsigned char nonce;
-    fc::uint256 h_sig;
+    binary h_sig;
 
-    stealth_note_encryption(fc::uint256 h_sig);
+    stealth_note_encryption(binary h_sig);
 
-    binary encrypt(const fc::uint256& encryption_public_key,
+    binary encrypt(const fc::ecc::public_key& encryption_public_key,
                                   const binary& plaintext);
 
-    static fc::uint256 generate_secret_key(const stealth_spending_key &paying_key);
-    static fc::uint256 generate_public_key(const fc::uint256 &secret_key);
+    static fc::ecc::private_key generate_secret_key(const stealth_spending_key &spending_key);
+    static fc::ecc::public_key generate_public_key(const fc::ecc::private_key &secret_key);
 };
 
 struct stealth_note_plaintext
@@ -118,13 +122,13 @@ struct stealth_note_plaintext
     static stealth_note_plaintext decrypt(
                                  const stealth_note_decryption& decryptor,
                                  const binary& ciphertext,
-                                 const fc::uint256& ephemeral_key,
-                                 const fc::uint256& h_sig,
+                                 const fc::ecc::public_key& ephemeral_key,
+                                 const binary& h_sig,
                                  unsigned char nonce
                                 );
 
     binary encrypt(stealth_note_encryption& encryptor,
-                                  const fc::uint256& transmission_key) const;
+                   const fc::ecc::public_key& transmission_key) const;
 };
 
 struct stealth_input
@@ -143,7 +147,7 @@ struct stealth_output
 
     stealth_note note(const fc::uint256& nullifier_base,
                       const fc::uint256& trapdoor, size_t i,
-                      const fc::uint256& h_sig) const;
+                      const binary& h_sig) const;
 };
 
 typedef unsigned long long uint64;

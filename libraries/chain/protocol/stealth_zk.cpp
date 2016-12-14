@@ -43,6 +43,13 @@ fc::uint256 random_uint256()
     return ret;
 }
 
+binary random_binary(size_t size)
+{
+    binary ret(size, 0);
+    fc::rand_bytes(ret.data(), ret.size());
+    return ret;
+}
+
 ///////////////////////////////////////////////////////////
 // PRF
 ///////////////////////////////////////////////////////////
@@ -112,14 +119,14 @@ fc::uint256 stealth_payment_address::hash() const
     return fc::sha256::hash(fc::raw::pack( *this ));
 }
 
-fc::uint256 stealth_viewing_key::transmission_key() const
+fc::ecc::public_key stealth_viewing_key::transmission_key() const
 {
     return stealth_note_encryption::generate_public_key(value);
 }
 
 stealth_spending_key stealth_spending_key::random()
 {
-    return stealth_spending_key({random_uint256()});
+    return stealth_spending_key({fc::ecc::private_key::generate()});
 }
 
 stealth_viewing_key stealth_spending_key::viewing_key() const
@@ -131,8 +138,8 @@ stealth_viewing_key stealth_spending_key::viewing_key() const
 
 stealth_payment_address stealth_spending_key::address() const
 {
-    return stealth_payment_address({PRF_addr_a_pk(value),
-                                    viewing_key().transmission_key()});
+    return stealth_payment_address(
+        {PRF_addr_a_pk(value), viewing_key().transmission_key()});
 }
 
 
@@ -192,7 +199,7 @@ stealth_note stealth_note_plaintext::note(
 
 stealth_note_plaintext stealth_note_plaintext::decrypt(
         const stealth_note_decryption &decryptor, const binary &ciphertext,
-        const fc::uint256 &ephemeral_key, const fc::uint256 &h_sig,
+        const fc::ecc::public_key &ephemeral_key, const binary &h_sig,
         unsigned char nonce)
 {
     auto plaintext = decryptor.decrypt(ciphertext, ephemeral_key, h_sig,
@@ -201,7 +208,7 @@ stealth_note_plaintext stealth_note_plaintext::decrypt(
 }
 
 binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
-                                       const fc::uint256 &transmission_key) const
+                                       const fc::ecc::public_key &transmission_key) const
 {
     return encryptor.encrypt(transmission_key, fc::raw::pack(*this));
 }
@@ -210,18 +217,11 @@ binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
 // Note encryption/decryption
 //////////////////////////////////////////////////////////////////
 
-void clamp_curve25519(fc::uint256 key)
-{
-    key.data()[0] &= 248;
-    key.data()[31] &= 127;
-    key.data()[31] |= 64;
-}
-
 fc::uint256 KDF(
     const fc::uint256 &dhsecret,
-    const fc::uint256 &epk,
-    const fc::uint256 &pk_enc,
-    const fc::uint256 &hSig,
+    const fc::ecc::public_key &epk,
+    const fc::ecc::public_key &pk_enc,
+    const binary &h_sig,
     unsigned char nonce
    )
 {
@@ -229,44 +229,37 @@ fc::uint256 KDF(
         throw std::logic_error("no additional nonce space for KDF");
     }
 
-    boost::array<char, 129> block;
-    memcpy(&block[0], hSig.data(), hSig.data_size());
-    memcpy(&block[32], dhsecret.data(), dhsecret.data_size());
-    memcpy(&block[64], epk.data(), epk.data_size());
-    memcpy(&block[96], pk_enc.data(), pk_enc.data_size());
-    block[128] = nonce;
-
-    return fc::sha256::hash(block.data(), block.size());
+    fc::sha256::encoder e;
+    fc::raw::pack(e, dhsecret);
+    fc::raw::pack(e, epk);
+    fc::raw::pack(e, pk_enc);
+    fc::raw::pack(e, h_sig);
+    fc::raw::pack(e, nonce);
+    return e.result();
 }
 
-stealth_note_encryption::stealth_note_encryption(fc::uint256 sig) :
+stealth_note_encryption::stealth_note_encryption(binary sig) :
     nonce(0),
     h_sig(sig)
 {
     // Create the ephemeral keypair
-    ephemeral_secret_key = random_uint256();
+    ephemeral_secret_key = fc::ecc::private_key::generate();
     ephemeral_public_key =
             stealth_note_encryption::generate_public_key(
                 ephemeral_secret_key
                 );
 }
 
-binary stealth_note_encryption::encrypt(const fc::uint256 &encryption_public_key,
+binary stealth_note_encryption::encrypt(const fc::ecc::public_key &encryption_public_key,
                                         const binary &plaintext)
-{
-    fc::diffie_hellman dh;
-    dh.priv_key.assign(ephemeral_secret_key.data(),
-                       ephemeral_secret_key.data() +
-                       ephemeral_secret_key.data_size());
-    dh.generate_pub_key();
-    dh.compute_shared_key(encryption_public_key.data(),
-                          encryption_public_key.data_size());
-    fc::uint256 dhsecret(&dh.shared_key[0],
-            dh.shared_key.size()); // TODO: check if it is correct
+{    
+    fc::uint512 shared = ephemeral_secret_key.get_shared_secret(encryption_public_key);
+    fc::uint256 dhsecret = fc::sha256::hash(shared);
 
     // Construct the symmetric key
-    fc::uint256 K = KDF(dhsecret, ephemeral_public_key, encryption_public_key,
-        h_sig, nonce);
+    fc::uint256 K = KDF(dhsecret, ephemeral_public_key,
+                        encryption_public_key,
+                        h_sig, nonce);
 
     // Increment the number of encryptions we've performed
     nonce++;
@@ -278,63 +271,66 @@ binary stealth_note_encryption::encrypt(const fc::uint256 &encryption_public_key
     bf.encrypt(reinterpret_cast<unsigned char*>(ciphertext.data()),
                ciphertext.size());
 
+    // add checksum to verify integrity
+    fc::sha256::encoder e;
+    fc::raw::pack(e, K);
+    fc::raw::pack(e, ciphertext);
+    auto check = e.result();
+
+    ciphertext.insert(ciphertext.end(), check.data(),
+                      check.data() + check.data_size());
+
     return ciphertext;
 }
 
-fc::uint256 stealth_note_encryption::generate_secret_key(
-        const stealth_spending_key &paying_key)
+fc::ecc::private_key stealth_note_encryption::generate_secret_key(
+        const stealth_spending_key &spending_key)
 {
-    fc::uint256 sk = PRF_addr_sk_enc(paying_key.value);
-    clamp_curve25519(sk);
-    return sk;
+    fc::uint256 sk = PRF_addr_sk_enc(spending_key.value);
+    return fc::ecc::private_key::generate_from_seed(sk);
 }
 
-fc::uint256 stealth_note_encryption::generate_public_key(
-        const fc::uint256 &secret_key)
+fc::ecc::public_key stealth_note_encryption::generate_public_key(
+        const fc::ecc::private_key &secret_key)
 {
-    fc::diffie_hellman dh;
-    dh.priv_key.assign(secret_key.data(), secret_key.data() +
-                       secret_key.data_size());
-    dh.generate_pub_key();
-
-    ilog("D_H generated pub key size ${size}", ("size", dh.pub_key.size()));
-
-    FC_ASSERT(dh.pub_key.size() == 32, "D_H generated pub key size shuld be 32");
-
-    return fc::uint256(dh.pub_key.data(), dh.pub_key.size());
+    return secret_key.get_public_key();
 }
 
 
-stealth_note_decryption::stealth_note_decryption(fc::uint256 s_k):
+stealth_note_decryption::stealth_note_decryption(fc::ecc::private_key s_k):
     secret_key(s_k)
 {
     public_key = stealth_note_encryption::generate_public_key(secret_key);
 }
 
 binary stealth_note_decryption::decrypt(const binary &ciphertext,
-                                        const fc::uint256 &ephemeral_public_key,
-                                        const fc::uint256 &h_sig,
+                                        const fc::ecc::public_key &ephemeral_public_key,
+                                        const binary &h_sig,
                                         unsigned char nonce) const
 {
-    fc::diffie_hellman dh;
-    dh.priv_key.assign(secret_key.data(),
-                       secret_key.data() +
-                       secret_key.data_size());
-    dh.generate_pub_key();
-    dh.compute_shared_key(ephemeral_public_key.data(),
-                          ephemeral_public_key.data_size());
-    fc::uint256 dhsecret(&dh.shared_key[0],
-            dh.shared_key.size()); // TODO: check if it is correct
+    fc::uint512 shared = secret_key.get_shared_secret(ephemeral_public_key);
+    fc::uint256 dhsecret = fc::sha256::hash(shared);
 
     // Construct the symmetric key
     fc::uint256 K = KDF(dhsecret, ephemeral_public_key,
                        public_key,
         h_sig, nonce);
 
-    // Increment the number of encryptions we've performed
-    nonce++;
 
     binary plaintext(ciphertext);
+    // extract checksum
+    FC_ASSERT(plaintext.size() > 32);
+    auto shift = plaintext.size() - 32;
+    fc::sha256 check_orig(plaintext.data() + shift, 32);
+    plaintext.erase(plaintext.begin() + shift, plaintext.end());
+
+    fc::sha256::encoder e;
+    fc::raw::pack(e, K);
+    fc::raw::pack(e, plaintext);
+    auto check = e.result();
+    if(check != check_orig)
+        throw std::runtime_error("Failed to decrypt message");
+
 
     fc::blowfish bf;
     bf.start(reinterpret_cast<unsigned char*>(K.data()), K.data_size());
@@ -351,7 +347,7 @@ fc::uint256 stealth_input::nullifier() const
 
 stealth_note stealth_output::note(const fc::uint256 &nullifier_base,
                                   const fc::uint256 &trapdoor, size_t i,
-                                  const fc::uint256 &h_sig) const
+                                  const binary &h_sig) const
 {
 
 }

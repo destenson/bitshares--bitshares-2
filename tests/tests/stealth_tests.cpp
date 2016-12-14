@@ -39,17 +39,18 @@ using namespace graphene::chain;
 
 BOOST_AUTO_TEST_CASE( stealth_test )
 { try {
-        fc::uint256 num("21035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a07");
-        stealth_spending_key paying_key({num});
-        fc::uint256 sk_enc =
+        fc::ecc::private_key sk1 = fc::ecc::private_key::generate();
+        stealth_spending_key paying_key({sk1});
+        fc::ecc::private_key sk_enc =
                 stealth_note_encryption::generate_secret_key(paying_key);
-        fc::uint256 pk_enc =
+        fc::ecc::public_key pk_enc =
                 stealth_note_encryption::generate_public_key(sk_enc);
 
-        stealth_note_encryption b = stealth_note_encryption(fc::uint256());
+        binary h_sig = random_binary(256);
+        stealth_note_encryption b = stealth_note_encryption(h_sig);
         for (size_t i = 0; i < 100; i++)
         {
-            stealth_note_encryption c = stealth_note_encryption(fc::uint256());
+            stealth_note_encryption c = stealth_note_encryption(h_sig);
     
             BOOST_REQUIRE(b.ephemeral_public_key != c.ephemeral_public_key);
         }
@@ -68,44 +69,44 @@ BOOST_AUTO_TEST_CASE( stealth_test )
     
                 // Test decryption
                 auto plaintext = decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                   fc::uint256(), i);
+                                                   h_sig, i);
                 BOOST_REQUIRE(plaintext == message);
     
                 // Test wrong nonce
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                fc::uint256(), (i == 0) ? 1 : (i - 1)),
+                                                h_sig, (i == 0) ? 1 : (i - 1)),
                               std::runtime_error);
             
                 // Test wrong ephemeral key
                 {
-                    stealth_note_encryption c = stealth_note_encryption(fc::uint256());
+                    stealth_note_encryption c = stealth_note_encryption(h_sig);
     
                     BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext,
                                                           c.ephemeral_public_key,
-                                                   fc::uint256(), i), std::runtime_error);
+                                                   h_sig, i), std::runtime_error);
                 }
             
                 // Test wrong seed
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                      fc::uint256("11035d60bc1983e37950ce4803418a8fb33ea68d5b937ca382ecbae7564d6a77"), i),
+                                                      random_binary(256), i),
                                     std::runtime_error);
             
                 // Test corrupted ciphertext
                 ciphertext[10] ^= 0xff;
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                      fc::uint256(), i),
+                                                      h_sig, i),
                                     std::runtime_error);
                 ciphertext[10] ^= 0xff;
             }
     
             {
                 // Test wrong private key
-                stealth_spending_key paying_key2({fc::uint256()});
-                fc::uint256 sk_enc_2 = stealth_note_encryption::generate_secret_key(paying_key2);
+                stealth_spending_key paying_key2({fc::ecc::private_key::generate()});
+                fc::ecc::private_key sk_enc_2 = stealth_note_encryption::generate_secret_key(paying_key2);
                 stealth_note_decryption decrypter(sk_enc_2);
     
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                      fc::uint256(), i),
+                                                      h_sig, i),
                                     std::runtime_error);
             }
     
