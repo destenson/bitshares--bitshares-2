@@ -25,7 +25,7 @@
 #include <graphene/chain/database.hpp>
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/dh.hpp>
-#include <fc/crypto/blowfish.hpp>
+#include <fc/crypto/aes.hpp>
 
 #include <array>
 
@@ -217,7 +217,7 @@ binary stealth_note_plaintext::encrypt(stealth_note_encryption &encryptor,
 // Note encryption/decryption
 //////////////////////////////////////////////////////////////////
 
-fc::uint256 KDF(
+fc::uint512 KDF(
     const fc::uint256 &dhsecret,
     const fc::ecc::public_key &epk,
     const fc::ecc::public_key &pk_enc,
@@ -229,7 +229,7 @@ fc::uint256 KDF(
         throw std::logic_error("no additional nonce space for KDF");
     }
 
-    fc::sha256::encoder e;
+    fc::sha512::encoder e;
     fc::raw::pack(e, dhsecret);
     fc::raw::pack(e, epk);
     fc::raw::pack(e, pk_enc);
@@ -257,19 +257,14 @@ binary stealth_note_encryption::encrypt(const fc::ecc::public_key &encryption_pu
     fc::uint256 dhsecret = fc::sha256::hash(shared);
 
     // Construct the symmetric key
-    fc::uint256 K = KDF(dhsecret, ephemeral_public_key,
+    fc::uint512 K = KDF(dhsecret, ephemeral_public_key,
                         encryption_public_key,
                         h_sig, nonce);
 
     // Increment the number of encryptions we've performed
     nonce++;
 
-    binary ciphertext(plaintext);
-
-    fc::blowfish bf;
-    bf.start(reinterpret_cast<unsigned char*>(K.data()), K.data_size());
-    bf.encrypt(reinterpret_cast<unsigned char*>(ciphertext.data()),
-               ciphertext.size());
+    binary ciphertext = fc::aes_encrypt(K, plaintext);
 
     // add checksum to verify integrity
     fc::sha256::encoder e;
@@ -312,32 +307,26 @@ binary stealth_note_decryption::decrypt(const binary &ciphertext,
     fc::uint256 dhsecret = fc::sha256::hash(shared);
 
     // Construct the symmetric key
-    fc::uint256 K = KDF(dhsecret, ephemeral_public_key,
+    fc::uint512 K = KDF(dhsecret, ephemeral_public_key,
                        public_key,
         h_sig, nonce);
 
 
-    binary plaintext(ciphertext);
+    binary c(ciphertext);
     // extract checksum
-    FC_ASSERT(plaintext.size() > 32);
-    auto shift = plaintext.size() - 32;
-    fc::sha256 check_orig(plaintext.data() + shift, 32);
-    plaintext.erase(plaintext.begin() + shift, plaintext.end());
+    FC_ASSERT(c.size() > 32);
+    auto shift = c.size() - 32;
+    fc::sha256 check_orig(c.data() + shift, 32);
+    c.erase(c.begin() + shift, c.end());
 
     fc::sha256::encoder e;
     fc::raw::pack(e, K);
-    fc::raw::pack(e, plaintext);
+    fc::raw::pack(e, c);
     auto check = e.result();
     if(check != check_orig)
         throw std::runtime_error("Failed to decrypt message");
 
-
-    fc::blowfish bf;
-    bf.start(reinterpret_cast<unsigned char*>(K.data()), K.data_size());
-    bf.decrypt(reinterpret_cast<unsigned char*>(plaintext.data()),
-               plaintext.size());
-
-    return plaintext;
+    return fc::aes_decrypt(K, c);
 }
 
 fc::uint256 stealth_input::nullifier() const

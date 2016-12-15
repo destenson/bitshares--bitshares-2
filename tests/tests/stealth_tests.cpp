@@ -37,7 +37,7 @@ using namespace graphene::chain;
 
 //BOOST_FIXTURE_TEST_SUITE( stealth_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( stealth_test )
+BOOST_AUTO_TEST_CASE( stealth_encryption_test )
 { try {
         fc::ecc::private_key sk1 = fc::ecc::private_key::generate();
         stealth_spending_key paying_key({sk1});
@@ -113,6 +113,45 @@ BOOST_AUTO_TEST_CASE( stealth_test )
         }
 
 
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( stealth_note_test )
+{ try {
+    stealth_spending_key a_sk({fc::ecc::private_key::generate()});
+    fc::ecc::private_key sk_enc =
+            stealth_note_encryption::generate_secret_key(a_sk);
+    fc::ecc::public_key pk_enc =
+            stealth_note_encryption::generate_public_key(sk_enc);
+
+    binary h_sig = random_binary(256);
+    stealth_payment_address addr_pk = a_sk.address();
+
+    stealth_note_encryption encryptor(h_sig);
+    fc::ecc::public_key epk = encryptor.ephemeral_public_key;
+
+    stealth_note note(addr_pk.paying_key,
+              asset(1945813),
+              random_uint256(),
+              random_uint256()
+             );
+
+    binary memo(STEALTH_MEMO_SIZE, 1);
+
+    stealth_note_plaintext note_pt(note, memo);
+
+    binary ct = note_pt.encrypt(encryptor, pk_enc);
+
+    stealth_note_decryption decryptor(sk_enc);
+
+    auto decrypted = stealth_note_plaintext::decrypt(decryptor, ct, epk, h_sig, 0);
+    auto decrypted_note = decrypted.note(addr_pk);
+
+    BOOST_REQUIRE(decrypted_note.paying_key == note.paying_key);
+    BOOST_REQUIRE(decrypted_note.nullifier_base == note.nullifier_base);
+    BOOST_REQUIRE(decrypted_note.trapdoor == note.trapdoor);
+    BOOST_REQUIRE(decrypted_note.amount == note.amount);
+
+    BOOST_REQUIRE(decrypted.memo == note_pt.memo);
 } FC_LOG_AND_RETHROW() }
 
 //BOOST_AUTO_TEST_SUITE_END()
