@@ -131,8 +131,30 @@ struct stealth_note_plaintext
                    const fc::ecc::public_key& transmission_key) const;
 };
 
+struct stealth_merkle_path
+{
+    std::vector<std::vector<bool>> authentication_path;
+    std::vector<bool> index;
+};
+
+struct stealth_incremental_witness
+{
+    stealth_merkle_path path() const;
+    fc::uint256 root() const;
+    void append(fc::uint256 obj);
+};
+
+struct stealth_incremental_merkle_tree
+{
+    fc::uint256 root();
+    void append(fc::uint256 hash);
+    stealth_incremental_witness witness() const;
+    static fc::uint256 empty_root();
+};
+
 struct stealth_input
 {
+    stealth_incremental_witness witness;
     stealth_note note;
     stealth_spending_key spending_key;
 
@@ -145,6 +167,9 @@ struct stealth_output
     asset value;
     binary memo;
 
+    stealth_output() {}
+    stealth_output(stealth_payment_address a, asset v) : address(a), value(v){}
+
     stealth_note note(const fc::uint256& nullifier_base,
                       const fc::uint256& trapdoor, size_t i,
                       const binary& h_sig) const;
@@ -155,6 +180,45 @@ typedef unsigned long long uint64;
 struct stealth_proof
 {
 
+};
+
+struct stealth_joinsplit
+{
+    static stealth_joinsplit generate();
+    static stealth_joinsplit unopened();
+
+    static binary h_sig(const fc::uint256& random_seed,
+                             const boost::array<fc::uint256, 2>& nullifiers,
+                             const fc::uint256& public_key_hash);
+
+    stealth_proof prove(
+        const boost::array<stealth_input, 2>& inputs,
+        const boost::array<stealth_output, 2>& outputs,
+        boost::array<stealth_note, 2>& out_notes,
+        boost::array<binary, 2>& out_ciphertexts,
+        fc::ecc::public_key& out_ephemeral_key,
+        const fc::uint256& public_key_hash,
+        fc::uint256& out_random_seed,
+        boost::array<fc::uint256, 2>& out_hmacs,
+        boost::array<fc::uint256, 2>& out_nullifiers,
+        boost::array<fc::uint256, 2>& out_commitments,
+        uint64 vpub_old,
+        uint64 vpub_new,
+        const fc::uint256& rt,
+        bool compute_proof = true
+    );
+
+    bool verify(
+        const stealth_proof& proof,
+        const fc::uint256& public_key_hash,
+        const fc::uint256& random_seed,
+        const boost::array<fc::uint256, 2>& hmacs,
+        const boost::array<fc::uint256, 2>& nullifiers,
+        const boost::array<fc::uint256, 2>& commitments,
+        uint64 vpub_old,
+        uint64 vpub_new,
+        const fc::uint256& rt
+    );
 };
 
 struct stealth_transfer_operation : public base_operation

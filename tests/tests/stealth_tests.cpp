@@ -154,5 +154,150 @@ BOOST_AUTO_TEST_CASE( stealth_note_test )
     BOOST_REQUIRE(decrypted.memo == note_pt.memo);
 } FC_LOG_AND_RETHROW() }
 
+
+BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
+{ try {
+
+    // The recipient's information.
+    stealth_spending_key recipient_key = stealth_spending_key::random();
+    stealth_payment_address recipient_addr = recipient_key.address();
+
+    // Create the commitment tree
+    stealth_incremental_merkle_tree tree;
+
+    // Set up a JoinSplit description
+    fc::ecc::public_key ephemeralKey;
+    fc::uint256 randomSeed;
+    uint64_t vpub_old = 10;
+    uint64_t vpub_new = 0;
+    fc::uint256 pubKeyHash = random_uint256();
+    boost::array<fc::uint256, 2> macs;
+    boost::array<fc::uint256, 2> nullifiers;
+    boost::array<fc::uint256, 2> commitments;
+    fc::uint256 rt = tree.root();
+    boost::array<binary, 2> ciphertexts;
+    stealth_proof proof;
+
+    stealth_joinsplit js;
+
+    {
+        boost::array<stealth_input, 2> inputs = {
+            stealth_input(), // dummy input
+            stealth_input() // dummy input
+        };
+
+        boost::array<stealth_output, 2> outputs = {
+            stealth_output(recipient_addr, asset(10)),
+            stealth_output() // dummy output
+        };
+
+        boost::array<stealth_note, 2> output_notes;
+
+        // Perform the proof
+        proof = js.prove(
+            inputs,
+            outputs,
+            output_notes,
+            ciphertexts,
+            ephemeralKey,
+            pubKeyHash,
+            randomSeed,
+            macs,
+            nullifiers,
+            commitments,
+            vpub_old,
+            vpub_new,
+            rt
+        );
+    }
+
+    // Verify the transaction:
+    BOOST_REQUIRE(js.verify(
+        proof,
+        pubKeyHash,
+        randomSeed,
+        macs,
+        nullifiers,
+        commitments,
+        vpub_old,
+        vpub_new,
+        rt
+    ));
+
+    // Recipient should decrypt
+    // Now the recipient should spend the money again
+    auto h_sig = js.h_sig(randomSeed, nullifiers, pubKeyHash);
+    stealth_note_decryption decryptor(recipient_key.viewing_key().value);
+
+    auto note_pt = stealth_note_plaintext::decrypt(
+        decryptor,
+        ciphertexts[0],
+        ephemeralKey,
+        h_sig,
+        0
+    );
+
+    auto decrypted_note = note_pt.note(recipient_addr);
+
+    BOOST_REQUIRE(decrypted_note.amount.amount == 10);
+
+    // Insert the commitments from the last tx into the tree
+    tree.append(commitments[0]);
+    auto witness_recipient = tree.witness();
+    tree.append(commitments[1]);
+    witness_recipient.append(commitments[1]);
+    vpub_old = 0;
+    vpub_new = 1;
+    rt = tree.root();
+    pubKeyHash = random_uint256();
+
+    {
+        boost::array<stealth_input, 2> inputs = {
+            stealth_input(), // dummy input
+            stealth_input({witness_recipient, decrypted_note, recipient_key})
+        };
+
+        stealth_spending_key second_recipient = stealth_spending_key::random();
+        stealth_payment_address second_addr = second_recipient.address();
+
+        boost::array<stealth_output, 2> outputs = {
+            stealth_output(second_addr, asset(9)),
+            stealth_output() // dummy output
+        };
+
+        boost::array<stealth_note, 2> output_notes;
+
+        // Perform the proof
+        proof = js.prove(
+            inputs,
+            outputs,
+            output_notes,
+            ciphertexts,
+            ephemeralKey,
+            pubKeyHash,
+            randomSeed,
+            macs,
+            nullifiers,
+            commitments,
+            vpub_old,
+            vpub_new,
+            rt
+        );
+    }
+
+    // Verify the transaction:
+    BOOST_REQUIRE(js.verify(
+        proof,
+        pubKeyHash,
+        randomSeed,
+        macs,
+        nullifiers,
+        commitments,
+        vpub_old,
+        vpub_new,
+        rt
+    ));
+} FC_LOG_AND_RETHROW() }
+
 //BOOST_AUTO_TEST_SUITE_END()
 
