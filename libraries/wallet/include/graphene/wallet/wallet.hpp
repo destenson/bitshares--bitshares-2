@@ -1446,7 +1446,55 @@ class wallet_api
          const approval_delta& delta,
          bool broadcast /* = false */
          );
-         
+
+
+      /**
+       *  Generates a new stealth address for the given brain key.
+       */
+      vector<unsigned char> create_stealth_address( string brain_key  );
+
+      /**
+       * @return the total balance of all stealth assets for which this wallet
+       * has the private key
+       */
+      vector<asset> get_stealth_balances();
+
+      /**
+       * @return all stealth addresses for which this wallet has the private
+       * key
+      */
+      vector<vector<unsigned char> > get_stealth_addresses()const;
+
+      /**
+       * @return all stealth receipts to/form a particular account
+       */
+      vector<string> stealth_history( vector<unsigned char> stealth_address );
+
+
+      /**
+       *  Transfers a public balance to stealth balances using a
+       *  stealth transfer.
+       */
+      void transfer_to_stealth( string from_account_id_or_name,
+                                string asset_symbol,
+                                vector<unsigned char> stealth_address);
+
+      /**
+       * Transfers funds from a stealth balance to a public account balance.
+       */
+      void transfer_from_stealth(vector<unsigned char> from_stealth_address,
+                                 string to_account_id_or_name,
+                                 string amount,
+                                 string asset_symbol);
+
+      /**
+       *  Used to transfer from one stealth balance to another
+       */
+      void stealth_transfer( vector<unsigned char> from_stealth_address,
+                                         vector<unsigned char> to_stealth_address,
+                                         string amount,
+                                         string symbol);
+
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
       void dbg_make_uia(string creator, string symbol);
@@ -1647,5 +1695,12 @@ FC_API( graphene::wallet::wallet_api,
         (blind_transfer)
         (blind_history)
         (receive_blind_transfer)
+        (create_stealth_address)
+        (get_stealth_balances)
+        (get_stealth_addresses)
+        (stealth_history)
+        (transfer_to_stealth)
+        (transfer_from_stealth)
+        (stealth_transfer)
         (get_order_book)
       )

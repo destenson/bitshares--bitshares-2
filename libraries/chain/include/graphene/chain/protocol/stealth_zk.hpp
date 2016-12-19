@@ -131,17 +131,29 @@ struct stealth_note_plaintext
                    const fc::ecc::public_key& transmission_key) const;
 };
 
+/*
 struct stealth_merkle_path
 {
     std::vector<std::vector<bool>> authentication_path;
     std::vector<bool> index;
 };
 
+struct stealth_incremental_merkle_tree;
+
 struct stealth_incremental_witness
 {
+    friend struct stealth_incremental_merkle_tree;
+
     stealth_merkle_path path() const;
     fc::uint256 root() const;
     void append(fc::uint256 obj);
+private:
+    stealth_incremental_merkle_tree tree;
+    std::vector<fc::uint256> filled;
+    boost::optional<stealth_incremental_merkle_tree> cursor;
+    size_t cursor_depth = 0;
+    std::deque<fc::uint256> partial_path() const;
+    stealth_incremental_witness(stealth_incremental_merkle_tree t) : tree(t) {}
 };
 
 struct stealth_incremental_merkle_tree
@@ -151,10 +163,10 @@ struct stealth_incremental_merkle_tree
     stealth_incremental_witness witness() const;
     static fc::uint256 empty_root();
 };
-
+*/
 struct stealth_input
 {
-    stealth_incremental_witness witness;
+ //   stealth_incremental_witness witness;
     stealth_note note;
     stealth_spending_key spending_key;
 
@@ -170,7 +182,7 @@ struct stealth_output
     stealth_output() {}
     stealth_output(stealth_payment_address a, asset v) : address(a), value(v){}
 
-    stealth_note note(const fc::uint256& nullifier_base,
+    stealth_note note(const fc::uint256& phi,
                       const fc::uint256& trapdoor, size_t i,
                       const binary& h_sig) const;
 };

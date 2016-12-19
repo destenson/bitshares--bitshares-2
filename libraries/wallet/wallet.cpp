@@ -3411,7 +3411,45 @@ signed_transaction wallet_api::approve_proposal(
    bool broadcast /* = false */
    )
 {
-   return my->approve_proposal( fee_paying_account, proposal_id, delta, broadcast );
+    return my->approve_proposal( fee_paying_account, proposal_id, delta, broadcast );
+}
+
+vector<unsigned char> wallet_api::create_stealth_address(string brain_key)
+{
+    vector<unsigned char> res;
+    for(unsigned char c = 1; c < 65; c++)
+        res.push_back(c);
+    return res;
+}
+
+vector<asset> wallet_api::get_stealth_balances()
+{
+    return vector<asset>();
+}
+
+vector<vector<unsigned char> > wallet_api::get_stealth_addresses() const
+{
+    return vector<vector<unsigned char> >();
+}
+
+vector<string> wallet_api::stealth_history(vector<unsigned char> stealth_address)
+{
+    return vector<string>();
+}
+
+void wallet_api::transfer_to_stealth(string from_account_id_or_name, string asset_symbol, vector<unsigned char> stealth_address)
+{
+
+}
+
+void wallet_api::transfer_from_stealth(vector<unsigned char> from_stealth_address, string to_account_id_or_name, string amount, string asset_symbol)
+{
+
+}
+
+void wallet_api::stealth_transfer(vector<unsigned char> from_stealth_address, vector<unsigned char> to_stealth_address, string amount, string symbol)
+{
+
 }
 
 global_property_object wallet_api::get_global_properties() const

@@ -334,11 +334,103 @@ fc::uint256 stealth_input::nullifier() const
     return note.nullifier(spending_key);
 }
 
-stealth_note stealth_output::note(const fc::uint256 &nullifier_base,
+stealth_note stealth_output::note(const fc::uint256 &phi,
                                   const fc::uint256 &trapdoor, size_t i,
                                   const binary &h_sig) const
 {
+//    fc::uint256 nullifier_base = PRF_rho(phi, i, h_sig);
+//    return stealth_note(address.paying_key, value, nullifier_base, trapdoor);
+    return stealth_note();
+}
 
+/*
+stealth_merkle_path stealth_incremental_witness::path() const
+{
+    return tree.path(partial_path());
+}
+
+fc::uint256 stealth_incremental_witness::root() const
+{
+    return tree.root(Depth, partial_path());
+}
+
+void stealth_incremental_witness::append(fc::uint256 obj)
+{
+
+}
+
+std::deque<fc::uint256> stealth_incremental_witness::partial_path() const
+{
+
+}
+
+fc::uint256 stealth_incremental_merkle_tree::root()
+{
+
+}
+
+void stealth_incremental_merkle_tree::append(fc::uint256 hash)
+{
+
+}
+
+stealth_incremental_witness stealth_incremental_merkle_tree::witness() const
+{
+
+}
+
+fc::uint256 stealth_incremental_merkle_tree::empty_root()
+{
+
+}
+*/
+stealth_joinsplit stealth_joinsplit::generate()
+{
+
+}
+
+stealth_joinsplit stealth_joinsplit::unopened()
+{
+
+}
+
+bool stealth_joinsplit::verify(const stealth_proof &proof,
+                               const fc::uint256 &public_key_hash,
+                               const fc::uint256 &random_seed,
+                               const boost::array<fc::uint256, 2> &hmacs,
+                               const boost::array<fc::uint256, 2> &nullifiers,
+                               const boost::array<fc::uint256, 2> &commitments,
+                               uint64 vpub_old,
+                               uint64 vpub_new,
+                               const fc::uint256 &rt)
+{
+    return false;
+}
+
+stealth_proof stealth_joinsplit::prove(
+        const boost::array<stealth_input, 2> &inputs,
+        const boost::array<stealth_output, 2> &outputs,
+        boost::array<stealth_note, 2> &out_notes,
+        boost::array<binary, 2> &out_ciphertexts,
+        fc::ecc::public_key &out_ephemeral_key,
+        const fc::uint256 &public_key_hash,
+        fc::uint256 &out_random_seed,
+        boost::array<fc::uint256, 2> &out_hmacs,
+        boost::array<fc::uint256, 2> &out_nullifiers,
+        boost::array<fc::uint256, 2> &out_commitments,
+        uint64 vpub_old,
+        uint64 vpub_new,
+        const fc::uint256 &rt,
+        bool compute_proof)
+{
+    return stealth_proof();
+}
+
+binary stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
+                                const boost::array<fc::uint256, 2> &nullifiers,
+                                const fc::uint256 &public_key_hash)
+{
+    return binary();
 }
 
 }}

@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     stealth_payment_address recipient_addr = recipient_key.address();
 
     // Create the commitment tree
-    stealth_incremental_merkle_tree tree;
+//    stealth_incremental_merkle_tree tree;
 
     // Set up a JoinSplit description
     fc::ecc::public_key ephemeralKey;
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     boost::array<fc::uint256, 2> macs;
     boost::array<fc::uint256, 2> nullifiers;
     boost::array<fc::uint256, 2> commitments;
-    fc::uint256 rt = tree.root();
+    fc::uint256 rt;// = tree.root();
     boost::array<binary, 2> ciphertexts;
     stealth_proof proof;
 
@@ -242,19 +242,19 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     BOOST_REQUIRE(decrypted_note.amount.amount == 10);
 
     // Insert the commitments from the last tx into the tree
-    tree.append(commitments[0]);
-    auto witness_recipient = tree.witness();
-    tree.append(commitments[1]);
-    witness_recipient.append(commitments[1]);
+//    tree.append(commitments[0]);
+//    auto witness_recipient = tree.witness();
+//    tree.append(commitments[1]);
+//    witness_recipient.append(commitments[1]);
     vpub_old = 0;
     vpub_new = 1;
-    rt = tree.root();
+//    rt = tree.root();
     pubKeyHash = random_uint256();
 
     {
         boost::array<stealth_input, 2> inputs = {
             stealth_input(), // dummy input
-            stealth_input({witness_recipient, decrypted_note, recipient_key})
+            stealth_input({/*witness_recipient, */decrypted_note, recipient_key})
         };
 
         stealth_spending_key second_recipient = stealth_spending_key::random();
