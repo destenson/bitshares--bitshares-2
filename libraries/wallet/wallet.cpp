@@ -57,6 +57,7 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/crypto/aes.hpp>
 #include <fc/crypto/hex.hpp>
+#include <fc/crypto/base58.hpp>
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
 
@@ -2594,6 +2595,7 @@ public:
    const string _wallet_filename_extension = ".wallet";
 
    mutable map<asset_id_type, asset_object> _asset_cache;
+
 };
 
 std::string operation_printer::fee(const asset& a)const {
@@ -3414,42 +3416,73 @@ signed_transaction wallet_api::approve_proposal(
     return my->approve_proposal( fee_paying_account, proposal_id, delta, broadcast );
 }
 
-vector<unsigned char> wallet_api::create_stealth_address(string brain_key)
+string wallet_api::create_stealth_address()
 {
-    vector<unsigned char> res;
-    for(unsigned char c = 1; c < 65; c++)
-        res.push_back(c);
-    return res;
+    size_t s = my->_wallet.stealth_accs.size() + (size_t)time(0);
+    string name = "st" + fc::to_base58((const char*)&s, sizeof(size_t));
+    ilog("name ${name}", ("name", name));
+    transform(name.begin(), name.end(), name.begin(), ::tolower);
+    ilog("name ${name}", ("name", name));
+    string existing_name = list_my_accounts()[0].name;
+    create_account_with_brain_key(name, name, existing_name, existing_name, true);
+    my->_wallet.stealth_accs.push_back(name);
+    return fc::to_base58(name.data(), name.size());
 }
 
 vector<asset> wallet_api::get_stealth_balances()
 {
-    return vector<asset>();
+    vector<asset> res;
+    for(string& n: my->_wallet.stealth_accs)
+    {
+        vector<asset> data = list_account_balances(n);
+        res.insert(res.end(), data.begin(), data.end());
+    }
+    return res;
 }
 
-vector<vector<unsigned char> > wallet_api::get_stealth_addresses() const
+vector<string> wallet_api::get_stealth_addresses() const
 {
-    return vector<vector<unsigned char> >();
+    vector<string> res;
+    for(const string& n: my->_wallet.stealth_accs)
+        res.push_back(fc::to_base58(n.data(), n.size()));
+    return res;
 }
 
-vector<string> wallet_api::stealth_history(vector<unsigned char> stealth_address)
+vector<operation_detail> wallet_api::stealth_history(string stealth_address, int limit)
 {
-    return vector<string>();
+    vector<char> d = fc::from_base58(stealth_address);
+    string name(d.begin(), d.end());
+    return get_account_history(name, limit);
 }
 
-void wallet_api::transfer_to_stealth(string from_account_id_or_name, string asset_symbol, vector<unsigned char> stealth_address)
+void wallet_api::transfer_to_stealth(string from_account_id_or_name,
+                                     string amount,
+                                     string asset_symbol,
+                                     string stealth_address)
 {
-
+    vector<char> d = fc::from_base58(stealth_address);
+    string name(d.begin(), d.end());
+    transfer(from_account_id_or_name, name, amount, asset_symbol, "test_stealth", true);
 }
 
-void wallet_api::transfer_from_stealth(vector<unsigned char> from_stealth_address, string to_account_id_or_name, string amount, string asset_symbol)
+void wallet_api::transfer_from_stealth(string from_stealth_address,
+                                       string to_account_id_or_name,
+                                       string amount, string asset_symbol)
 {
-
+    vector<char> d = fc::from_base58(from_stealth_address);
+    string name(d.begin(), d.end());
+    transfer(name, to_account_id_or_name, amount, asset_symbol, "test_stealth", true);
 }
 
-void wallet_api::stealth_transfer(vector<unsigned char> from_stealth_address, vector<unsigned char> to_stealth_address, string amount, string symbol)
+void wallet_api::stealth_transfer(string from_stealth_address,
+                                  string to_stealth_address, string amount,
+                                  string symbol)
 {
-
+    vector<char> d_from = fc::from_base58(from_stealth_address);
+    string name_from(d_from.begin(), d_from.end());
+    vector<char> d_to = fc::from_base58(to_stealth_address);
+    string name_to(d_to.begin(), d_to.end());
+    transfer(name_from, name_to, amount, symbol, "test_stealth", true);
 }
 
 global_property_object wallet_api::get_global_properties() const

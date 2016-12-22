@@ -194,6 +194,8 @@ struct wallet_data
    string                    ws_server = "ws://localhost:8090";
    string                    ws_user;
    string                    ws_password;
+
+   vector<string> stealth_accs;
 };
 
 struct exported_account_keys
@@ -1451,7 +1453,7 @@ class wallet_api
       /**
        *  Generates a new stealth address for the given brain key.
        */
-      vector<unsigned char> create_stealth_address( string brain_key  );
+      string create_stealth_address();
 
       /**
        * @return the total balance of all stealth assets for which this wallet
@@ -1463,26 +1465,26 @@ class wallet_api
        * @return all stealth addresses for which this wallet has the private
        * key
       */
-      vector<vector<unsigned char> > get_stealth_addresses()const;
+      vector<string> get_stealth_addresses()const;
 
       /**
        * @return all stealth receipts to/form a particular account
        */
-      vector<string> stealth_history( vector<unsigned char> stealth_address );
+      vector<operation_detail> stealth_history(string stealth_address, int limit);
 
 
       /**
        *  Transfers a public balance to stealth balances using a
        *  stealth transfer.
        */
-      void transfer_to_stealth( string from_account_id_or_name,
+      void transfer_to_stealth(string from_account_id_or_name, string amount,
                                 string asset_symbol,
-                                vector<unsigned char> stealth_address);
+                                string stealth_address);
 
       /**
        * Transfers funds from a stealth balance to a public account balance.
        */
-      void transfer_from_stealth(vector<unsigned char> from_stealth_address,
+      void transfer_from_stealth(string from_stealth_address,
                                  string to_account_id_or_name,
                                  string amount,
                                  string asset_symbol);
@@ -1490,8 +1492,8 @@ class wallet_api
       /**
        *  Used to transfer from one stealth balance to another
        */
-      void stealth_transfer( vector<unsigned char> from_stealth_address,
-                                         vector<unsigned char> to_stealth_address,
+      void stealth_transfer( string from_stealth_address,
+                                         string to_stealth_address,
                                          string amount,
                                          string symbol);
 
@@ -1547,6 +1549,7 @@ FC_REFLECT( graphene::wallet::wallet_data,
             (ws_server)
             (ws_user)
             (ws_password)
+            (stealth_accs)
           )
 
 FC_REFLECT( graphene::wallet::brain_key_info,
