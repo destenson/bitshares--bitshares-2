@@ -3418,14 +3418,17 @@ signed_transaction wallet_api::approve_proposal(
 
 string wallet_api::create_stealth_address()
 {
+    load_wallet_file();
     size_t s = my->_wallet.stealth_accs.size() + (size_t)time(0);
     string name = "st" + fc::to_base58((const char*)&s, sizeof(size_t));
-    ilog("name ${name}", ("name", name));
     transform(name.begin(), name.end(), name.begin(), ::tolower);
     ilog("name ${name}", ("name", name));
     string existing_name = list_my_accounts()[0].name;
+    ilog("try to create account");
     create_account_with_brain_key(name, name, existing_name, existing_name, true);
+    ilog("account is created");
     my->_wallet.stealth_accs.push_back(name);
+    save_wallet_file();
     return fc::to_base58(name.data(), name.size());
 }
 
