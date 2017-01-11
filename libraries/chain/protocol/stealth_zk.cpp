@@ -92,7 +92,8 @@ fc::uint256 PRF_nf(const fc::uint256& a_sk, const fc::uint256& rho)
     return PRF(1, 1, 1, 0, a_sk, rho);
 }
 
-fc::uint256 PRF_pk(const fc::uint256& a_sk, size_t i0, const fc::uint256& h_sig)
+fc::uint256 PRF_pk(const fc::uint256& a_sk, size_t i0,
+                   const fc::uint256& h_sig)
 {
     if ((i0 != 0) && (i0 != 1)) {
         throw std::domain_error("PRF_pk invoked with index out of bounds");
@@ -101,7 +102,8 @@ fc::uint256 PRF_pk(const fc::uint256& a_sk, size_t i0, const fc::uint256& h_sig)
     return PRF(0, i0, 0, 0, a_sk, h_sig);
 }
 
-fc::uint256 PRF_rho(const fc::uint256& phi, size_t i0, const fc::uint256& h_sig)
+fc::uint256 PRF_rho(const fc::uint256& phi, size_t i0,
+                    const fc::uint256& h_sig)
 {
     if ((i0 != 0) && (i0 != 1)) {
         throw std::domain_error("PRF_rho invoked with index out of bounds");
@@ -199,7 +201,7 @@ stealth_note stealth_note_plaintext::note(
 
 stealth_note_plaintext stealth_note_plaintext::decrypt(
         const stealth_note_decryption &decryptor, const binary &ciphertext,
-        const fc::ecc::public_key &ephemeral_key, const binary &h_sig,
+        const fc::ecc::public_key &ephemeral_key, const fc::uint256 &h_sig,
         unsigned char nonce)
 {
     auto plaintext = decryptor.decrypt(ciphertext, ephemeral_key, h_sig,
@@ -221,7 +223,7 @@ fc::uint512 KDF(
     const fc::uint256 &dhsecret,
     const fc::ecc::public_key &epk,
     const fc::ecc::public_key &pk_enc,
-    const binary &h_sig,
+    const fc::uint256 &h_sig,
     unsigned char nonce
    )
 {
@@ -238,7 +240,7 @@ fc::uint512 KDF(
     return e.result();
 }
 
-stealth_note_encryption::stealth_note_encryption(binary sig) :
+stealth_note_encryption::stealth_note_encryption(fc::uint256 sig) :
     nonce(0),
     h_sig(sig)
 {
@@ -300,7 +302,7 @@ stealth_note_decryption::stealth_note_decryption(fc::ecc::private_key s_k):
 
 binary stealth_note_decryption::decrypt(const binary &ciphertext,
                                         const fc::ecc::public_key &ephemeral_public_key,
-                                        const binary &h_sig,
+                                        const fc::uint256 &h_sig,
                                         unsigned char nonce) const
 {
     fc::uint512 shared = secret_key.get_shared_secret(ephemeral_public_key);
@@ -308,8 +310,7 @@ binary stealth_note_decryption::decrypt(const binary &ciphertext,
 
     // Construct the symmetric key
     fc::uint512 K = KDF(dhsecret, ephemeral_public_key,
-                       public_key,
-        h_sig, nonce);
+                       public_key, h_sig, nonce);
 
 
     binary c(ciphertext);
@@ -336,11 +337,10 @@ fc::uint256 stealth_input::nullifier() const
 
 stealth_note stealth_output::note(const fc::uint256 &phi,
                                   const fc::uint256 &trapdoor, size_t i,
-                                  const binary &h_sig) const
+                                  const fc::uint256 &h_sig) const
 {
-//    fc::uint256 nullifier_base = PRF_rho(phi, i, h_sig);
-//    return stealth_note(address.paying_key, value, nullifier_base, trapdoor);
-    return stealth_note();
+    fc::uint256 nullifier_base = PRF_rho(phi, i, h_sig);
+    return stealth_note(address.paying_key, value, nullifier_base, trapdoor);
 }
 
 /*
@@ -386,12 +386,12 @@ fc::uint256 stealth_incremental_merkle_tree::empty_root()
 */
 stealth_joinsplit stealth_joinsplit::generate()
 {
-
+    return stealth_joinsplit();
 }
 
 stealth_joinsplit stealth_joinsplit::unopened()
 {
-
+    return stealth_joinsplit();
 }
 
 bool stealth_joinsplit::verify(const stealth_proof &proof,
@@ -426,11 +426,11 @@ stealth_proof stealth_joinsplit::prove(
     return stealth_proof();
 }
 
-binary stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
+fc::uint256 stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
                                 const boost::array<fc::uint256, 2> &nullifiers,
                                 const fc::uint256 &public_key_hash)
 {
-    return binary();
+    return fc::uint256();
 }
 
 }}

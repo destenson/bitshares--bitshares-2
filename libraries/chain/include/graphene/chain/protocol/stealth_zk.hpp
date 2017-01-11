@@ -86,7 +86,7 @@ struct stealth_note_decryption
 
     binary decrypt(const binary &ciphertext,
                       const fc::ecc::public_key &ephemeral_public_key,
-                      const binary &h_sig,
+                      const fc::uint256 &h_sig,
                       unsigned char nonce
                      ) const;
 };
@@ -96,9 +96,9 @@ struct stealth_note_encryption
     fc::ecc::public_key ephemeral_public_key;
     fc::ecc::private_key ephemeral_secret_key;
     unsigned char nonce;
-    binary h_sig;
+    fc::uint256 h_sig;
 
-    stealth_note_encryption(binary h_sig);
+    stealth_note_encryption(fc::uint256 h_sig);
 
     binary encrypt(const fc::ecc::public_key& encryption_public_key,
                                   const binary& plaintext);
@@ -123,7 +123,7 @@ struct stealth_note_plaintext
                                  const stealth_note_decryption& decryptor,
                                  const binary& ciphertext,
                                  const fc::ecc::public_key& ephemeral_key,
-                                 const binary& h_sig,
+                                 const fc::uint256& h_sig,
                                  unsigned char nonce
                                 );
 
@@ -184,7 +184,7 @@ struct stealth_output
 
     stealth_note note(const fc::uint256& phi,
                       const fc::uint256& trapdoor, size_t i,
-                      const binary& h_sig) const;
+                      const fc::uint256& h_sig) const;
 };
 
 typedef unsigned long long uint64;
@@ -199,7 +199,7 @@ struct stealth_joinsplit
     static stealth_joinsplit generate();
     static stealth_joinsplit unopened();
 
-    static binary h_sig(const fc::uint256& random_seed,
+    static fc::uint256 h_sig(const fc::uint256& random_seed,
                              const boost::array<fc::uint256, 2>& nullifiers,
                              const fc::uint256& public_key_hash);
 
