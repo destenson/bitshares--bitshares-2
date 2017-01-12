@@ -28,6 +28,7 @@
 #include <fc/crypto/aes.hpp>
 
 #include <array>
+#include <boost/foreach.hpp>
 
 namespace graphene { namespace chain {
 
@@ -47,6 +48,31 @@ binary random_binary(size_t size)
 {
     binary ret(size, 0);
     fc::rand_bytes(ret.data(), ret.size());
+    return ret;
+}
+
+fc::uint256 combine256(const fc::uint256& v1, const fc::uint256& v2)
+{
+    fc::sha256::encoder e;
+    fc::raw::pack(e, v1);
+    fc::raw::pack(e, v2);
+    return e.result();
+}
+
+
+// Convert bytes into boolean vector. (MSB to LSB)
+std::vector<bool> convert_bytes_vector_to_vector(const std::vector<unsigned char>& bytes) {
+    std::vector<bool> ret;
+    ret.resize(bytes.size() * 8);
+
+    unsigned char c;
+    for (size_t i = 0; i < bytes.size(); i++) {
+        c = bytes.at(i);
+        for (size_t j = 0; j < 8; j++) {
+            ret.at((i*8)+j) = (c >> (7-j)) & 1;
+        }
+    }
+
     return ret;
 }
 
@@ -343,47 +369,290 @@ stealth_note stealth_output::note(const fc::uint256 &phi,
     return stealth_note(address.paying_key, value, nullifier_base, trapdoor);
 }
 
-/*
-stealth_merkle_path stealth_incremental_witness::path() const
+template <size_t Depth>
+class merkle_path_filler {
+private:
+    std::deque<fc::uint256> queue;
+    static stealth_empty_merkle_roots<Depth> emptyroots;
+public:
+    merkle_path_filler() : queue() { }
+    merkle_path_filler(std::deque<fc::uint256> queue) : queue(queue) { }
+
+    fc::uint256 next(size_t depth) {
+        if (queue.size() > 0) {
+            fc::uint256 h = queue.front();
+            queue.pop_front();
+
+            return h;
+        } else {
+            return emptyroots.empty_root(depth);
+        }
+    }
+
+};
+
+template<size_t Depth>
+stealth_empty_merkle_roots<Depth> merkle_path_filler<Depth>::emptyroots;
+
+
+template<size_t Depth>
+stealth_empty_merkle_roots<Depth> stealth_incremental_merkle_tree<Depth>::emptyroots;
+
+template<size_t Depth>
+stealth_merkle_path stealth_incremental_witness<Depth>::path() const
 {
     return tree.path(partial_path());
 }
 
-fc::uint256 stealth_incremental_witness::root() const
+template<size_t Depth>
+fc::uint256 stealth_incremental_witness<Depth>::root() const
 {
     return tree.root(Depth, partial_path());
 }
 
-void stealth_incremental_witness::append(fc::uint256 obj)
+template<size_t Depth>
+void stealth_incremental_witness<Depth>::append(fc::uint256 obj)
 {
+    if (cursor) {
+        cursor->append(obj);
 
+        if (cursor->is_complete(cursor_depth)) {
+            filled.push_back(cursor->root(cursor_depth));
+            cursor = boost::none;
+        }
+    } else {
+        cursor_depth = tree.next_depth(filled.size());
+
+        if (cursor_depth >= Depth) {
+            throw std::runtime_error("tree is full");
+        }
+
+        if (cursor_depth == 0) {
+            filled.push_back(obj);
+        } else {
+            cursor = stealth_incremental_merkle_tree<Depth>();
+            cursor->append(obj);
+        }
+    }
 }
 
-std::deque<fc::uint256> stealth_incremental_witness::partial_path() const
+template<size_t Depth>
+std::deque<fc::uint256> stealth_incremental_witness<Depth>::partial_path() const
 {
+    std::deque<fc::uint256> uncles(filled.begin(), filled.end());
 
+    if (cursor) {
+        uncles.push_back(cursor->root(cursor_depth));
+    }
+
+    return uncles;
 }
 
-fc::uint256 stealth_incremental_merkle_tree::root()
+template<size_t Depth>
+fc::uint256 stealth_incremental_merkle_tree<Depth>::root()
 {
-
+    return root(Depth, std::deque<fc::uint256>());
 }
 
-void stealth_incremental_merkle_tree::append(fc::uint256 hash)
+template<size_t Depth>
+void stealth_incremental_merkle_tree<Depth>::append(fc::uint256 obj)
 {
+    if (is_complete(Depth)) {
+        throw std::runtime_error("tree is full");
+    }
 
+    if (!left) {
+        // Set the left leaf
+        left = obj;
+    } else if (!right) {
+        // Set the right leaf
+        right = obj;
+    } else {
+        // Combine the leaves and propagate it up the tree
+        boost::optional<fc::uint256> combined = combine256(*left, *right);
+
+        // Set the "left" leaf to the object and make the "right" leaf none
+        left = obj;
+        right = boost::none;
+
+        for (size_t i = 0; i < Depth; i++) {
+            if (i < parents.size()) {
+                if (parents[i]) {
+                    combined = combine256(*parents[i], *combined);
+                    parents[i] = boost::none;
+                } else {
+                    parents[i] = *combined;
+                    break;
+                }
+            } else {
+                parents.push_back(combined);
+                break;
+            }
+        }
+    }
 }
 
-stealth_incremental_witness stealth_incremental_merkle_tree::witness() const
+template<size_t Depth>
+stealth_incremental_witness<Depth> stealth_incremental_merkle_tree<Depth>::witness() const
 {
-
+    return stealth_incremental_witness<Depth>(*this);
 }
 
-fc::uint256 stealth_incremental_merkle_tree::empty_root()
+template<size_t Depth>
+fc::uint256 stealth_incremental_merkle_tree<Depth>::empty_root()
 {
-
+    return emptyroots.empty_root(Depth);
 }
-*/
+
+template<size_t Depth>
+stealth_merkle_path stealth_incremental_merkle_tree<Depth>::path(
+        std::deque<fc::uint256> filler_hashes) const
+{
+    if (!left) {
+        throw std::runtime_error("can't create an authentication path for the beginning of the tree");
+    }
+
+    merkle_path_filler<Depth> filler(filler_hashes);
+
+    std::vector<fc::uint256> path;
+    std::vector<bool> index;
+
+    if (right) {
+        index.push_back(true);
+        path.push_back(*left);
+    } else {
+        index.push_back(false);
+        path.push_back(filler.next(0));
+    }
+
+    size_t d = 1;
+
+    BOOST_FOREACH(const boost::optional<fc::uint256>& parent, parents) {
+        if (parent) {
+            index.push_back(true);
+            path.push_back(*parent);
+        } else {
+            index.push_back(false);
+            path.push_back(filler.next(d));
+        }
+
+        d++;
+    }
+
+    while (d < Depth) {
+        index.push_back(false);
+        path.push_back(filler.next(d));
+        d++;
+    }
+
+    std::vector<std::vector<bool>> merkle_path;
+    BOOST_FOREACH(fc::uint256 b, path)
+    {
+        std::vector<unsigned char> hashv(b.data(), b.data() + b.data_size());
+
+        merkle_path.push_back(convert_bytes_vector_to_vector(hashv));
+    }
+
+    std::reverse(merkle_path.begin(), merkle_path.end());
+    std::reverse(index.begin(), index.end());
+
+    return stealth_merkle_path(merkle_path, index);
+}
+
+template<size_t Depth>
+fc::uint256 stealth_incremental_merkle_tree<Depth>::root(
+        size_t depth, std::deque<fc::uint256> filler_hashes) const
+{
+    merkle_path_filler<Depth> filler(filler_hashes);
+
+    fc::uint256 combine_left =  left  ? *left  : filler.next(0);
+    fc::uint256 combine_right = right ? *right : filler.next(0);
+
+    fc::uint256 root = combine256(combine_left, combine_right);
+
+    size_t d = 1;
+
+    BOOST_FOREACH(const boost::optional<fc::uint256>& parent, parents) {
+        if (parent) {
+            root = combine256(*parent, root);
+        } else {
+            root = combine256(root, filler.next(d));
+        }
+
+        d++;
+    }
+
+    // We may not have parents for ancestor trees, so we fill
+    // the rest in here.
+    while (d < depth) {
+        root = combine256(root, filler.next(d));
+        d++;
+    }
+
+    return root;
+}
+
+template<size_t Depth>
+bool stealth_incremental_merkle_tree<Depth>::is_complete(size_t depth) const
+{
+    if (!left || !right) {
+        return false;
+    }
+
+    if (parents.size() != (depth - 1)) {
+        return false;
+    }
+
+    BOOST_FOREACH(const boost::optional<fc::uint256>& parent, parents) {
+        if (!parent) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+template<size_t Depth>
+size_t stealth_incremental_merkle_tree<Depth>::next_depth(size_t skip) const
+{
+    if (!left) {
+        if (skip) {
+            skip--;
+        } else {
+            return 0;
+        }
+    }
+
+    if (!right) {
+        if (skip) {
+            skip--;
+        } else {
+            return 0;
+        }
+    }
+
+    size_t d = 1;
+
+    BOOST_FOREACH(const boost::optional<fc::uint256>& parent, parents) {
+        if (!parent) {
+            if (skip) {
+                skip--;
+            } else {
+                return d;
+            }
+        }
+
+        d++;
+    }
+
+    return d + skip;
+}
+
+template class stealth_incremental_merkle_tree<29>;
+template class stealth_incremental_merkle_tree<4>;
+template class stealth_incremental_witness<29>;
+template class stealth_incremental_witness<4>;
+
 stealth_joinsplit stealth_joinsplit::generate()
 {
     return stealth_joinsplit();
@@ -432,6 +701,7 @@ fc::uint256 stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
 {
     return fc::uint256();
 }
+
 
 }}
 

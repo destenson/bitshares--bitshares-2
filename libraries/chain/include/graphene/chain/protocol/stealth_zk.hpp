@@ -26,6 +26,7 @@
 #include <graphene/chain/protocol/base.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <boost/array.hpp>
+#include <boost/optional.hpp>
 
 namespace graphene { namespace chain {
 
@@ -34,7 +35,7 @@ typedef std::vector<char> binary;
 
 fc::uint256 random_uint256();
 binary random_binary(size_t size);
-
+fc::uint256 combine256(const fc::uint256 &v1, const fc::uint256 &v2);
 
 struct stealth_payment_address
 {
@@ -131,46 +132,129 @@ struct stealth_note_plaintext
                    const fc::ecc::public_key& transmission_key) const;
 };
 
-/*
 struct stealth_merkle_path
 {
     std::vector<std::vector<bool>> authentication_path;
     std::vector<bool> index;
+
+    stealth_merkle_path() {}
+    stealth_merkle_path(std::vector<std::vector<bool>> ap, std::vector<bool> i):
+        authentication_path(ap), index(i) {}
 };
 
-struct stealth_incremental_merkle_tree;
+template<size_t Depth>
+class stealth_empty_merkle_roots {
+public:
+    stealth_empty_merkle_roots() {
+        empty_roots.at(0) = fc::uint256();
+        for (size_t d = 1; d <= Depth; d++)
+            empty_roots.at(d) = combine256(empty_roots.at(d-1), empty_roots.at(d-1));
+    }
+    fc::uint256 empty_root(size_t depth) {
+        return empty_roots.at(depth);
+    }
+    template <size_t D>
+    friend bool operator==(const stealth_empty_merkle_roots<D>& a,
+                           const stealth_empty_merkle_roots<D>& b);
+private:
+    boost::array<fc::uint256, Depth+1> empty_roots;
+};
 
+template<size_t Depth>
+bool operator==(const stealth_empty_merkle_roots<Depth>& a,
+                const stealth_empty_merkle_roots<Depth>& b) {
+    return a.empty_roots == b.empty_roots;
+}
+
+template<size_t Depth>
+struct stealth_incremental_witness;
+
+template<size_t Depth>
+struct stealth_incremental_merkle_tree
+{
+    friend struct stealth_incremental_witness<Depth>;
+    template <size_t D>
+    friend bool operator==(const stealth_incremental_merkle_tree<D>& a,
+                           const stealth_incremental_merkle_tree<D>& b);
+
+    fc::uint256 root();
+    void append(fc::uint256 hash);
+    stealth_incremental_witness<Depth> witness() const;
+    static fc::uint256 empty_root();
+private:
+    static stealth_empty_merkle_roots<Depth> emptyroots;
+    boost::optional<fc::uint256> left;
+    boost::optional<fc::uint256> right;
+
+    // Collapsed "left" subtrees ordered toward the root of the tree.
+    std::vector<boost::optional<fc::uint256>> parents;
+    stealth_merkle_path path(
+            std::deque<fc::uint256> filler_hashes = std::deque<fc::uint256>()) const;
+    fc::uint256 root(size_t depth,
+                     std::deque<fc::uint256> filler_hashes = std::deque<fc::uint256>()) const;
+    bool is_complete(size_t depth = Depth) const;
+    size_t next_depth(size_t skip) const;
+};
+
+template<size_t Depth>
+bool operator==(const stealth_incremental_merkle_tree<Depth>& a,
+                const stealth_incremental_merkle_tree<Depth>& b) {
+    return (a.emptyroots == b.emptyroots &&
+            a.left == b.left &&
+            a.right == b.right &&
+            a.parents == b.parents);
+}
+
+
+template<size_t Depth>
 struct stealth_incremental_witness
 {
-    friend struct stealth_incremental_merkle_tree;
+    friend struct stealth_incremental_merkle_tree<Depth>;
+    template <size_t D>
+    friend bool operator==(const stealth_incremental_witness<D>& a,
+                           const stealth_incremental_witness<D>& b);
+
+    stealth_incremental_witness() {}
 
     stealth_merkle_path path() const;
     fc::uint256 root() const;
     void append(fc::uint256 obj);
+
 private:
-    stealth_incremental_merkle_tree tree;
+    stealth_incremental_merkle_tree<Depth> tree;
     std::vector<fc::uint256> filled;
-    boost::optional<stealth_incremental_merkle_tree> cursor;
+    boost::optional<stealth_incremental_merkle_tree<Depth>> cursor;
     size_t cursor_depth = 0;
     std::deque<fc::uint256> partial_path() const;
-    stealth_incremental_witness(stealth_incremental_merkle_tree t) : tree(t) {}
+    stealth_incremental_witness(stealth_incremental_merkle_tree<Depth> t) : tree(t) {}
 };
 
-struct stealth_incremental_merkle_tree
-{
-    fc::uint256 root();
-    void append(fc::uint256 hash);
-    stealth_incremental_witness witness() const;
-    static fc::uint256 empty_root();
-};
-*/
+template<size_t Depth>
+bool operator==(const stealth_incremental_witness<Depth>& a,
+                const stealth_incremental_witness<Depth>& b) {
+    return (a.tree == b.tree &&
+            a.filled == b.filled &&
+            a.cursor == b.cursor &&
+            a.cursor_depth == b.cursor_depth);
+}
+
+typedef stealth_incremental_witness<29> incremental_witness;
+typedef stealth_incremental_merkle_tree<29> merkle_tree;
+typedef stealth_incremental_witness<4> test_incremental_witness;
+typedef stealth_incremental_merkle_tree<4> test_merkle_tree;
+
 struct stealth_input
 {
- //   stealth_incremental_witness witness;
+    incremental_witness witness;
     stealth_note note;
     stealth_spending_key spending_key;
 
     fc::uint256 nullifier() const;
+
+    stealth_input() {}
+    stealth_input(incremental_witness w, stealth_note n,
+                  stealth_spending_key sk) :
+        witness(w), note(n), spending_key(sk) {}
 };
 
 struct stealth_output

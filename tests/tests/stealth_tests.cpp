@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE( stealth_encryption_test )
         fc::ecc::public_key pk_enc =
                 stealth_note_encryption::generate_public_key(sk_enc);
 
-        binary h_sig = random_binary(256);
+        fc::uint256 h_sig = random_uint256();
         stealth_note_encryption b = stealth_note_encryption(h_sig);
         for (size_t i = 0; i < 100; i++)
         {
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE( stealth_encryption_test )
             
                 // Test wrong seed
                 BOOST_REQUIRE_THROW(decrypter.decrypt(ciphertext, b.ephemeral_public_key,
-                                                      random_binary(256), i),
+                                                      random_uint256(), i),
                                     std::runtime_error);
             
                 // Test corrupted ciphertext
@@ -123,7 +123,7 @@ BOOST_AUTO_TEST_CASE( stealth_note_test )
     fc::ecc::public_key pk_enc =
             stealth_note_encryption::generate_public_key(sk_enc);
 
-    binary h_sig = random_binary(256);
+    fc::uint256 h_sig = random_uint256();
     stealth_payment_address addr_pk = a_sk.address();
 
     stealth_note_encryption encryptor(h_sig);
@@ -154,16 +154,41 @@ BOOST_AUTO_TEST_CASE( stealth_note_test )
     BOOST_REQUIRE(decrypted.memo == note_pt.memo);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(stealth_merkle_tree_test)
+{ try {
+    for (int start = 0; start < 20; start++) {
+        merkle_tree new_tree;
+
+        BOOST_REQUIRE(new_tree.root() == merkle_tree::empty_root());
+
+        for (int i = start; i > 0; i--) {
+            new_tree.append(fc::uint256("54d626e08c1c802b305dad30b7e54a82f102390cc92c7d4db112048935236e9c"));
+        }
+
+        fc::uint256 oldroot = new_tree.root();
+
+        // At this point, appending tons of null objects to the tree
+        // should preserve its root.
+
+        for (int i = 0; i < 100; i++) {
+            new_tree.append(fc::uint256());
+        }
+
+        BOOST_REQUIRE(new_tree.root() == oldroot);
+    }
+} FC_LOG_AND_RETHROW() }
+
+
 
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {
 
-    // The recipient's information.
+ /*   // The recipient's information.
     stealth_spending_key recipient_key = stealth_spending_key::random();
     stealth_payment_address recipient_addr = recipient_key.address();
 
     // Create the commitment tree
-//    stealth_incremental_merkle_tree tree;
+    merkle_tree tree;
 
     // Set up a JoinSplit description
     fc::ecc::public_key ephemeralKey;
@@ -174,7 +199,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     boost::array<fc::uint256, 2> macs;
     boost::array<fc::uint256, 2> nullifiers;
     boost::array<fc::uint256, 2> commitments;
-    fc::uint256 rt;// = tree.root();
+    fc::uint256 rt = tree.root();
     boost::array<binary, 2> ciphertexts;
     stealth_proof proof;
 
@@ -242,19 +267,19 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     BOOST_REQUIRE(decrypted_note.amount.amount == 10);
 
     // Insert the commitments from the last tx into the tree
-//    tree.append(commitments[0]);
-//    auto witness_recipient = tree.witness();
-//    tree.append(commitments[1]);
-//    witness_recipient.append(commitments[1]);
+    tree.append(commitments[0]);
+    auto witness_recipient = tree.witness();
+    tree.append(commitments[1]);
+    witness_recipient.append(commitments[1]);
     vpub_old = 0;
     vpub_new = 1;
-//    rt = tree.root();
+    rt = tree.root();
     pubKeyHash = random_uint256();
 
     {
         boost::array<stealth_input, 2> inputs = {
             stealth_input(), // dummy input
-            stealth_input({/*witness_recipient, */decrypted_note, recipient_key})
+            stealth_input(witness_recipient, decrypted_note, recipient_key)
         };
 
         stealth_spending_key second_recipient = stealth_spending_key::random();
@@ -296,7 +321,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         vpub_old,
         vpub_new,
         rt
-    ));
+    ));*/
 } FC_LOG_AND_RETHROW() }
 
 //BOOST_AUTO_TEST_SUITE_END()
