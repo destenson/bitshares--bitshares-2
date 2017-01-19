@@ -280,14 +280,14 @@ struct stealth_proof
 
 struct stealth_joinsplit
 {
-    static stealth_joinsplit generate();
-    static stealth_joinsplit unopened();
+    static stealth_joinsplit* generate();
+    static stealth_joinsplit* unopened();
 
     static fc::uint256 h_sig(const fc::uint256& random_seed,
                              const boost::array<fc::uint256, 2>& nullifiers,
                              const fc::uint256& public_key_hash);
 
-    stealth_proof prove(
+    virtual stealth_proof prove(
         const boost::array<stealth_input, 2>& inputs,
         const boost::array<stealth_output, 2>& outputs,
         boost::array<stealth_note, 2>& out_notes,
@@ -302,9 +302,9 @@ struct stealth_joinsplit
         uint64 vpub_new,
         const fc::uint256& rt,
         bool compute_proof = true
-    );
+    ) = 0;
 
-    bool verify(
+    virtual bool verify(
         const stealth_proof& proof,
         const fc::uint256& public_key_hash,
         const fc::uint256& random_seed,
@@ -314,7 +314,7 @@ struct stealth_joinsplit
         uint64 vpub_old,
         uint64 vpub_new,
         const fc::uint256& rt
-    );
+    ) = 0;
 };
 
 struct stealth_transfer_operation : public base_operation

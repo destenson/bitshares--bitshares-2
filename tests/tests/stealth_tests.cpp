@@ -30,7 +30,6 @@
 
 #include <graphene/chain/protocol/stealth_zk.hpp>
 #include <fc/crypto/sha256.hpp>
-//#include "../common/database_fixture.hpp"
 #include <iostream>
 
 using namespace graphene::chain;
@@ -183,7 +182,7 @@ BOOST_AUTO_TEST_CASE(stealth_merkle_tree_test)
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {
 
- /*   // The recipient's information.
+    // The recipient's information.
     stealth_spending_key recipient_key = stealth_spending_key::random();
     stealth_payment_address recipient_addr = recipient_key.address();
 
@@ -321,7 +320,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         vpub_old,
         vpub_new,
         rt
-    ));*/
+    ));
 } FC_LOG_AND_RETHROW() }
 
 //BOOST_AUTO_TEST_SUITE_END()

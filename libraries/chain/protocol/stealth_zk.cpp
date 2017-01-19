@@ -29,6 +29,8 @@
 
 #include <array>
 #include <boost/foreach.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
 namespace graphene { namespace chain {
 
@@ -653,53 +655,304 @@ template class stealth_incremental_merkle_tree<4>;
 template class stealth_incremental_witness<29>;
 template class stealth_incremental_witness<4>;
 
-stealth_joinsplit stealth_joinsplit::generate()
+struct joinsplit_impl : public stealth_joinsplit
 {
-    return stealth_joinsplit();
+    typedef default_r1cs_ppzksnark_pp ppzksnark_ppT;
+    typedef Fr<ppzksnark_ppT> FieldT;
+
+    boost::optional<r1cs_ppzksnark_proving_key<ppzksnark_ppT>> pk;
+    boost::optional<r1cs_ppzksnark_verification_key<ppzksnark_ppT>> vk;
+    boost::optional<std::string> pkPath;
+
+    joinsplit_impl() {}
+    ~joinsplit_impl() {}
+
+    static void initialize() {
+        //TODO: LOCK(cs_InitializeParams);
+
+        ppzksnark_ppT::init_public_params();
+    }
+
+    void setProvingKeyPath(std::string path) {
+        pkPath = path;
+    }
+
+    void loadProvingKey() {
+        if (!pk) {
+            if (!pkPath) {
+                throw std::runtime_error("proving key path unknown");
+            }
+            loadFromFile(*pkPath, pk);
+        }
+    }
+
+    void save_proving_key(std::string path) {
+        if (pk) {
+            save_to_file(path, *pk);
+        } else {
+            throw std::runtime_error("cannot save proving key; key doesn't exist");
+        }
+    }
+
+    void load_verifying_key(std::string path) {
+        load_from_file(path, vk);
+    }
+
+    void save_verifying_key(std::string path) {
+        if (vk) {
+            save_to_file(path, *vk);
+        } else {
+            throw std::runtime_error("cannot save verifying key; key doesn't exist");
+        }
+    }
+
+    void save_r1cs(std::string path) {
+        auto r1cs = generate_r1cs();
+
+        save_to_file(path, r1cs);
+    }
+
+    r1cs_constraint_system<FieldT> generate_r1cs() {
+        protoboard<FieldT> pb;
+
+        joinsplit_gadget<FieldT> g(pb);
+        g.generate_r1cs_constraints();
+
+        return pb.get_constraint_system();
+    }
+
+    void generate_impl() {
+        const r1cs_constraint_system<FieldT> constraint_system = generate_r1cs();
+        r1cs_ppzksnark_keypair<ppzksnark_ppT> keypair =
+                r1cs_ppzksnark_generator<ppzksnark_ppT>(constraint_system);
+
+        pk = keypair.pk;
+        vk = keypair.vk;
+    }
+
+    bool verify(const stealth_proof &proof,
+               const fc::uint256 &public_key_hash,
+               const fc::uint256 &random_seed,
+               const boost::array<fc::uint256, 2> &hmacs,
+               const boost::array<fc::uint256, 2> &nullifiers,
+               const boost::array<fc::uint256, 2> &commitments,
+               uint64 vpub_old,
+               uint64 vpub_new,
+               const fc::uint256 &rt)
+    {
+        if (!vk) {
+            throw std::runtime_error("JoinSplit verifying key not loaded");
+        }
+
+        try {
+            auto r1cs_proof = proof.to_libsnark_proof<r1cs_ppzksnark_proof<ppzksnark_ppT>>();
+
+            fc::uint256 h_sig = this->h_sig(randomSeed, nullifiers, pubKeyHash);
+
+            auto witness = joinsplit_gadget<FieldT>::witness_map(
+                rt,
+                h_sig,
+                macs,
+                nullifiers,
+                commitments,
+                vpub_old,
+                vpub_new
+            );
+
+            return r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(*vk, witness, r1cs_proof);
+        } catch (...) {
+            return false;
+        }
+    }
+
+    stealth_proof prove(
+            const boost::array<stealth_input, 2> &inputs,
+            const boost::array<stealth_output, 2> &outputs,
+            boost::array<stealth_note, 2> &out_notes,
+            boost::array<binary, 2> &out_ciphertexts,
+            fc::ecc::public_key &out_ephemeral_key,
+            const fc::uint256 &public_key_hash,
+            fc::uint256 &out_random_seed,
+            boost::array<fc::uint256, 2> &out_hmacs,
+            boost::array<fc::uint256, 2> &out_nullifiers,
+            boost::array<fc::uint256, 2> &out_commitments,
+            uint64 vpub_old,
+            uint64 vpub_new,
+            const fc::uint256 &rt,
+            bool compute_proof)
+    {
+        if (compute_proof && !pk) {
+            throw std::runtime_error("JoinSplit proving key not loaded");
+        }
+
+        if (vpub_old > MAX_MONEY) {
+            throw std::invalid_argument("nonsensical vpub_old value");
+        }
+
+        if (vpub_new > MAX_MONEY) {
+            throw std::invalid_argument("nonsensical vpub_new value");
+        }
+
+        uint64 lhs_value = vpub_old;
+        uint64 rhs_value = vpub_new;
+
+        for (size_t i = 0; i < 2; i++) {
+            // Sanity checks of input
+            {
+                // If note has nonzero value, its witness's root must be equal to the
+                // input.
+                if ((inputs[i].note.value != 0) && (inputs[i].witness.root() != rt)) {
+                    throw std::invalid_argument("joinsplit not anchored to the correct root");
+                }
+
+                // Ensure we have the key to this note.
+                if (inputs[i].note.a_pk != inputs[i].key.address().a_pk) {
+                    throw std::invalid_argument("input note not authorized to spend with given key");
+                }
+
+                // Balance must be sensical
+                if (inputs[i].note.value > MAX_MONEY) {
+                    throw std::invalid_argument("nonsensical input note value");
+                }
+
+                lhs_value += inputs[i].note.value;
+
+                if (lhs_value > MAX_MONEY) {
+                    throw std::invalid_argument("nonsensical left hand size of joinsplit balance");
+                }
+            }
+
+            // Compute nullifier of input
+            out_nullifiers[i] = inputs[i].nullifier();
+        }
+
+        // Sample randomSeed
+        out_randomSeed = random_uint256();
+
+        // Compute h_sig
+        uint256 h_sig = this->h_sig(out_randomSeed, out_nullifiers, pubKeyHash);
+
+        // Sample phi
+        uint252 phi = random_uint252();
+
+        // Compute notes for outputs
+        for (size_t i = 0; i < NumOutputs; i++) {
+            // Sanity checks of output
+            {
+                if (outputs[i].value > MAX_MONEY) {
+                    throw std::invalid_argument("nonsensical output value");
+                }
+
+                rhs_value += outputs[i].value;
+
+                if (rhs_value > MAX_MONEY) {
+                    throw std::invalid_argument("nonsensical right hand side of joinsplit balance");
+                }
+            }
+
+            // Sample r
+            uint256 r = random_uint256();
+
+            out_notes[i] = outputs[i].note(phi, r, i, h_sig);
+        }
+
+        if (lhs_value != rhs_value) {
+            throw std::invalid_argument("invalid joinsplit balance");
+        }
+
+        // Compute the output commitments
+        for (size_t i = 0; i < NumOutputs; i++) {
+            out_commitments[i] = out_notes[i].cm();
+        }
+
+        // Encrypt the ciphertexts containing the note
+        // plaintexts to the recipients of the value.
+        {
+            ZCNoteEncryption encryptor(h_sig);
+
+            for (size_t i = 0; i < NumOutputs; i++) {
+                NotePlaintext pt(out_notes[i], outputs[i].memo);
+
+                out_ciphertexts[i] = pt.encrypt(encryptor, outputs[i].addr.pk_enc);
+            }
+
+            out_ephemeralKey = encryptor.get_epk();
+        }
+
+        // Authenticate h_sig with each of the input
+        // spending keys, producing macs which protect
+        // against malleability.
+        for (size_t i = 0; i < NumInputs; i++) {
+            out_macs[i] = PRF_pk(inputs[i].key, i, h_sig);
+        }
+
+        if (!computeProof) {
+            return ZCProof();
+        }
+
+        protoboard<FieldT> pb;
+        {
+            joinsplit_gadget<FieldT, NumInputs, NumOutputs> g(pb);
+            g.generate_r1cs_constraints();
+            g.generate_r1cs_witness(
+                phi,
+                rt,
+                h_sig,
+                inputs,
+                out_notes,
+                vpub_old,
+                vpub_new
+            );
+        }
+
+        // The constraint system must be satisfied or there is an unimplemented
+        // or incorrect sanity check above. Or the constraint system is broken!
+        assert(pb.is_satisfied());
+
+        // TODO: These are copies, which is not strictly necessary.
+        std::vector<FieldT> primary_input = pb.primary_input();
+        std::vector<FieldT> aux_input = pb.auxiliary_input();
+
+        // Swap A and B if it's beneficial (less arithmetic in G2)
+        // In our circuit, we already know that it's beneficial
+        // to swap, but it takes so little time to perform this
+        // estimate that it doesn't matter if we check every time.
+        pb.constraint_system.swap_AB_if_beneficial();
+
+        return ZCProof(r1cs_ppzksnark_prover<ppzksnark_ppT>(
+            *pk,
+            primary_input,
+            aux_input,
+            pb.constraint_system
+        ));
+    }
+};
+
+
+stealth_joinsplit* stealth_joinsplit::generate()
+{
+    joinsplit_impl::initialize();
+    auto js = new joinsplit_impl();
+    js->generate_impl();
+    return js;
 }
 
-stealth_joinsplit stealth_joinsplit::unopened()
+stealth_joinsplit* stealth_joinsplit::unopened()
 {
-    return stealth_joinsplit();
-}
-
-bool stealth_joinsplit::verify(const stealth_proof &proof,
-                               const fc::uint256 &public_key_hash,
-                               const fc::uint256 &random_seed,
-                               const boost::array<fc::uint256, 2> &hmacs,
-                               const boost::array<fc::uint256, 2> &nullifiers,
-                               const boost::array<fc::uint256, 2> &commitments,
-                               uint64 vpub_old,
-                               uint64 vpub_new,
-                               const fc::uint256 &rt)
-{
-    return false;
-}
-
-stealth_proof stealth_joinsplit::prove(
-        const boost::array<stealth_input, 2> &inputs,
-        const boost::array<stealth_output, 2> &outputs,
-        boost::array<stealth_note, 2> &out_notes,
-        boost::array<binary, 2> &out_ciphertexts,
-        fc::ecc::public_key &out_ephemeral_key,
-        const fc::uint256 &public_key_hash,
-        fc::uint256 &out_random_seed,
-        boost::array<fc::uint256, 2> &out_hmacs,
-        boost::array<fc::uint256, 2> &out_nullifiers,
-        boost::array<fc::uint256, 2> &out_commitments,
-        uint64 vpub_old,
-        uint64 vpub_new,
-        const fc::uint256 &rt,
-        bool compute_proof)
-{
-    return stealth_proof();
+    joinsplit_impl::initialize();
+    return new joinsplit_impl();
 }
 
 fc::uint256 stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
                                 const boost::array<fc::uint256, 2> &nullifiers,
                                 const fc::uint256 &public_key_hash)
 {
-    return fc::uint256();
+    fc::sha256::encoder e;
+    fc::raw::pack(e, random_seed);
+    fc::raw::pack(e, nullifiers[0]);\
+    fc::raw::pack(e, nullifiers[1]);
+    fc::raw::pack(e, public_key_hash);
+    return e.result();
 }
 
 
