@@ -273,9 +273,84 @@ struct stealth_output
 
 typedef unsigned long long uint64;
 
+const unsigned char G1_PREFIX_MASK = 0x02;
+const unsigned char G2_PREFIX_MASK = 0x0a;
+
+// Element in the base field
+struct Fq
+{
+    fc::uint256 data;
+
+    template<typename libsnark_Fq>
+    Fq(libsnark_Fq element);
+
+    template<typename libsnark_Fq>
+    libsnark_Fq to_libsnark_fq() const;
+};
+
+// Element in the extension field
+struct Fq2
+{
+    fc::uint256 data;
+
+    template<typename libsnark_Fq2>
+    Fq2(libsnark_Fq2 element);
+
+    template<typename libsnark_Fq2>
+    libsnark_Fq2 to_libsnark_fq2() const;
+};
+
+// Compressed point in G1
+struct CompressedG1
+{
+    bool y_lsb;
+    Fq x;
+
+    CompressedG1() : y_lsb(false), x() { }
+
+    template<typename libsnark_G1>
+    CompressedG1(libsnark_G1 point);
+
+    template<typename libsnark_G1>
+    libsnark_G1 to_libsnark_g1() const;
+};
+
+// Compressed point in G2
+struct CompressedG2
+{
+    bool y_gt;
+    Fq2 x;
+
+    CompressedG2() : y_gt(false), x() { }
+
+    template<typename libsnark_G2>
+    CompressedG2(libsnark_G2 point);
+
+    template<typename libsnark_G2>
+    libsnark_G2 to_libsnark_g2() const;
+};
+
 struct stealth_proof
 {
+    CompressedG1 g_A;
+    CompressedG1 g_A_prime;
+    CompressedG2 g_B;
+    CompressedG1 g_B_prime;
+    CompressedG1 g_C;
+    CompressedG1 g_C_prime;
+    CompressedG1 g_K;
+    CompressedG1 g_H;
 
+    // Produces a compressed proof using a libsnark zkSNARK proof
+    template<typename libsnark_proof>
+    stealth_proof(const libsnark_proof& proof);
+
+    // Produces a libsnark zkSNARK proof out of this proof,
+    // or throws an exception if it is invalid.
+    template<typename libsnark_proof>
+    libsnark_proof to_libsnark_proof() const;
+
+    static stealth_proof random_invalid();
 };
 
 struct stealth_joinsplit
