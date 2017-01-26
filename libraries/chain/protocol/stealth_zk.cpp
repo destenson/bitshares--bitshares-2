@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/protocol/stealth_zk.hpp>
+#include <graphene/chain/protocol/stealth_snark.hpp>
 #include <graphene/chain/database.hpp>
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/dh.hpp>
@@ -29,8 +30,6 @@
 
 #include <array>
 #include <boost/foreach.hpp>
-#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
 namespace graphene { namespace chain {
 
@@ -61,9 +60,19 @@ fc::uint256 combine256(const fc::uint256& v1, const fc::uint256& v2)
     return e.result();
 }
 
+std::vector<unsigned char> convert_int_to_bytes_vector(const u_int64_t &val_int)
+{
+    std::vector<unsigned char> bytes;
+
+    for(size_t i = 0; i < 8; i++) {
+        bytes.push_back(val_int >> (i * 8));
+    }
+
+    return bytes;
+}
 
 // Convert bytes into boolean vector. (MSB to LSB)
-std::vector<bool> convert_bytes_vector_to_vector(const std::vector<unsigned char>& bytes) {
+std::vector<bool> convert_bytes_vector_to_bool_vector(const std::vector<unsigned char>& bytes) {
     std::vector<bool> ret;
     ret.resize(bytes.size() * 8);
 
@@ -76,6 +85,46 @@ std::vector<bool> convert_bytes_vector_to_vector(const std::vector<unsigned char
     }
 
     return ret;
+}
+
+// Convert boolean vector (big endian) to integer
+u_int64_t convert_bool_vector_to_int(const std::vector<bool>& v)
+{
+    if (v.size() > 64) {
+        throw std::length_error ("boolean vector can't be larger than 64 bits");
+    }
+
+    u_int64_t result = 0;
+    for (size_t i=0; i<v.size();i++) {
+        if (v.at(i)) {
+            result |= (u_int64_t)1 << ((v.size() - 1) - i);
+        }
+    }
+
+    return result;
+}
+
+std::vector<bool> convert_int_to_bool_vector(const u_int64_t& val_int)
+{
+    return convert_bytes_vector_to_bool_vector(convert_int_to_bytes_vector(val_int));
+}
+
+std::vector<bool> convert_uint256_to_bool_vector(const fc::uint256& val)
+{
+    std::vector<unsigned char> data(val.data(), val.data() + val.data_size());
+    return convert_bytes_vector_to_bool_vector(data);
+}
+
+void insert_uint256(std::vector<bool>& into, fc::uint256 from)
+{
+    std::vector<bool> blob = convert_uint256_to_bool_vector(from);
+    into.insert(into.end(), blob.begin(), blob.end());
+}
+
+void insert_uint64(std::vector<bool>& into, u_int64_t from)
+{
+    std::vector<bool> num = convert_int_to_bool_vector(from);
+    into.insert(into.end(), num.begin(), num.end());
 }
 
 ///////////////////////////////////////////////////////////
@@ -552,7 +601,7 @@ stealth_merkle_path stealth_incremental_merkle_tree<Depth>::path(
     {
         std::vector<unsigned char> hashv(b.data(), b.data() + b.data_size());
 
-        merkle_path.push_back(convert_bytes_vector_to_vector(hashv));
+        merkle_path.push_back(convert_bytes_vector_to_bool_vector(hashv));
     }
 
     std::reverse(merkle_path.begin(), merkle_path.end());
@@ -655,397 +704,49 @@ template class stealth_incremental_merkle_tree<4>;
 template class stealth_incremental_witness<29>;
 template class stealth_incremental_witness<4>;
 
-template<>
-stealth_proof::stealth_proof(const r1cs_ppzksnark_proof<curve_pp> &proof)
-{
-    g_A = CompressedG1(proof.g_A.g);
-    g_A_prime = CompressedG1(proof.g_A.h);
-    g_B = CompressedG2(proof.g_B.g);
-    g_B_prime = CompressedG1(proof.g_B.h);
-    g_C = CompressedG1(proof.g_C.g);
-    g_C_prime = CompressedG1(proof.g_C.h);
-    g_K = CompressedG1(proof.g_K);
-    g_H = CompressedG1(proof.g_H);
+
+template<typename T>
+void save_to_file(std::string path, T& obj) {
+
+    std::stringstream ss;
+    ss << obj;
+    std::ofstream fh;
+    fh.open(path, std::ios::binary);
+    ss.rdbuf()->pubseekpos(0, std::ios_base::out);
+    fh << ss.rdbuf();
+    fh.flush();
+    fh.close();
 }
 
-template<>
-r1cs_ppzksnark_proof<curve_pp> stealth_proof::to_libsnark_proof() const
-{
-    r1cs_ppzksnark_proof<curve_pp> proof;
+template<typename T>
+void load_from_file(std::string path, boost::optional<T>& objIn) {
 
-    proof.g_A.g = g_A.to_libsnark_g1<curve_G1>();
-    proof.g_A.h = g_A_prime.to_libsnark_g1<curve_G1>();
-    proof.g_B.g = g_B.to_libsnark_g2<curve_G2>();
-    proof.g_B.h = g_B_prime.to_libsnark_g1<curve_G1>();
-    proof.g_C.g = g_C.to_libsnark_g1<curve_G1>();
-    proof.g_C.h = g_C_prime.to_libsnark_g1<curve_G1>();
-    proof.g_K = g_K.to_libsnark_g1<curve_G1>();
-    proof.g_H = g_H.to_libsnark_g1<curve_G1>();
+    std::stringstream ss;
+    std::ifstream fh(path, std::ios::binary);
 
-    return proof;
+    if(!fh.is_open()) {
+        throw std::runtime_error("could not load param file at %s");
+    }
+
+    ss << fh.rdbuf();
+    fh.close();
+
+    ss.rdbuf()->pubseekpos(0, std::ios_base::in);
+
+    T obj;
+    ss >> obj;
+
+    objIn = std::move(obj);
 }
-
-stealth_proof stealth_proof::random_invalid()
-{
-    stealth_proof p;
-    p.g_A = curve_G1::random_element();
-    p.g_A_prime = curve_G1::random_element();
-    p.g_B = curve_G2::random_element();
-    p.g_B_prime = curve_G1::random_element();
-    p.g_C = curve_G1::random_element();
-    p.g_C_prime = curve_G1::random_element();
-
-    p.g_K = curve_G1::random_element();
-    p.g_H = curve_G1::random_element();
-
-    return p;
-}
-
-template<typename FieldT>
-class joinsplit_gadget : gadget<FieldT> {
-private:
-    // Verifier inputs
-    pb_variable_array<FieldT> zk_packed_inputs;
-    pb_variable_array<FieldT> zk_unpacked_inputs;
-    std::shared_ptr<multipacking_gadget<FieldT>> unpacker;
-
-    std::shared_ptr<digest_variable<FieldT>> zk_merkle_root;
-    std::shared_ptr<digest_variable<FieldT>> zk_h_sig;
-    boost::array<std::shared_ptr<digest_variable<FieldT>>, 2> zk_input_nullifiers;
-    boost::array<std::shared_ptr<digest_variable<FieldT>>, 2> zk_input_macs;
-    boost::array<std::shared_ptr<digest_variable<FieldT>>, 2> zk_output_commitments;
-    pb_variable_array<FieldT> zk_vpub_old;
-    pb_variable_array<FieldT> zk_vpub_new;
-
-    // Aux inputs
-    pb_variable<FieldT> ZERO;
-    std::shared_ptr<digest_variable<FieldT>> zk_phi;
-    pb_variable_array<FieldT> zk_total_uint64;
-
-    // Input note gadgets
-    boost::array<std::shared_ptr<input_note_gadget<FieldT>>, 2> zk_input_notes;
-    boost::array<std::shared_ptr<PRF_pk_gadget<FieldT>>, 2> zk_mac_authentication;
-
-    // Output note gadgets
-    boost::array<std::shared_ptr<output_note_gadget<FieldT>>, 2> zk_output_notes;
-
-public:
-
-    joinsplit_gadget(protoboard<FieldT> &pb) : gadget<FieldT>(pb) {
-        // Verification
-        {
-            // The verification inputs are all bit-strings of various
-            // lengths (256-bit digests and 64-bit integers) and so we
-            // pack them into as few field elements as possible. (The
-            // more verification inputs you have, the more expensive
-            // verification is.)
-            zk_packed_inputs.allocate(pb, verifying_field_element_size());
-            pb.set_input_sizes(verifying_field_element_size());
-
-            alloc_uint256(zk_unpacked_inputs, zk_merkle_root);
-            alloc_uint256(zk_unpacked_inputs, zk_h_sig);
-
-            for (size_t i = 0; i < 2; i++) {
-                alloc_uint256(zk_unpacked_inputs, zk_input_nullifiers[i]);
-                alloc_uint256(zk_unpacked_inputs, zk_input_macs[i]);
-            }
-
-            for (size_t i = 0; i < 2; i++) {
-                alloc_uint256(zk_unpacked_inputs, zk_output_commitments[i]);
-            }
-
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_old);
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_new);
-
-            assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
-
-            // This gadget will ensure that all of the inputs we provide are
-            // boolean constrained.
-            unpacker.reset(new multipacking_gadget<FieldT>(
-                pb,
-                zk_unpacked_inputs,
-                zk_packed_inputs,
-                FieldT::capacity(),
-                "unpacker"
-            ));
-        }
-
-        // We need a constant "zero" variable in some contexts. In theory
-        // it should never be necessary, but libsnark does not synthesize
-        // optimal circuits.
-        //
-        // The first variable of our constraint system is constrained
-        // to be one automatically for us, and is known as `ONE`.
-        ZERO.allocate(pb);
-
-        zk_phi.reset(new digest_variable<FieldT>(pb, 252, ""));
-
-        zk_total_uint64.allocate(pb, 64);
-
-        for (size_t i = 0; i < 2; i++) {
-            // Input note gadget for commitments, macs, nullifiers,
-            // and spend authority.
-            zk_input_notes[i].reset(new input_note_gadget<FieldT>(
-                pb,
-                ZERO,
-                zk_input_nullifiers[i],
-                *zk_merkle_root
-            ));
-
-            // The input keys authenticate h_sig to prevent
-            // malleability.
-            zk_mac_authentication[i].reset(new PRF_pk_gadget<FieldT>(
-                pb,
-                ZERO,
-                zk_input_notes[i]->a_sk->bits,
-                zk_h_sig->bits,
-                i ? true : false,
-                zk_input_macs[i]
-            ));
-        }
-
-        for (size_t i = 0; i < 2; i++) {
-            zk_output_notes[i].reset(new output_note_gadget<FieldT>(
-                pb,
-                ZERO,
-                zk_phi->bits,
-                zk_h_sig->bits,
-                i ? true : false,
-                zk_output_commitments[i]
-            ));
-        }
-    }
-
-    void generate_r1cs_constraints() {
-        // The true passed here ensures all the inputs
-        // are boolean constrained.
-        unpacker->generate_r1cs_constraints(true);
-
-        // Constrain `ZERO`
-        generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
-
-        // Constrain bitness of phi
-        zk_phi->generate_r1cs_constraints();
-
-        for (size_t i = 0; i < 2; i++) {
-            // Constrain the JoinSplit input constraints.
-            zk_input_notes[i]->generate_r1cs_constraints();
-
-            // Authenticate h_sig with a_sk
-            zk_mac_authentication[i]->generate_r1cs_constraints();
-        }
-
-        for (size_t i = 0; i < 2; i++) {
-            // Constrain the JoinSplit output constraints.
-            zk_output_notes[i]->generate_r1cs_constraints();
-        }
-
-        // Value balance
-        {
-            linear_combination<FieldT> left_side = packed_addition(zk_vpub_old);
-            for (size_t i = 0; i < 2; i++) {
-                left_side = left_side + packed_addition(zk_input_notes[i]->value);
-            }
-
-            linear_combination<FieldT> right_side = packed_addition(zk_vpub_new);
-            for (size_t i = 0; i < 2; i++) {
-                right_side = right_side + packed_addition(zk_output_notes[i]->value);
-            }
-
-            // Ensure that both sides are equal
-            this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
-                1,
-                left_side,
-                right_side
-            ));
-
-            // #854: Ensure that left_side is a 64-bit integer.
-            for (size_t i = 0; i < 64; i++) {
-                generate_boolean_r1cs_constraint<FieldT>(
-                    this->pb,
-                    zk_total_uint64[i],
-                    ""
-                );
-            }
-
-            this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
-                1,
-                left_side,
-                packed_addition(zk_total_uint64)
-            ));
-        }
-    }
-
-    void generate_r1cs_witness(
-        const uint252& phi,
-        const uint256& rt,
-        const uint256& h_sig,
-        const boost::array<JSInput, 2>& inputs,
-        const boost::array<Note, 2>& outputs,
-        uint64_t vpub_old,
-        uint64_t vpub_new
-    ) {
-        // Witness `zero`
-        this->pb.val(ZERO) = FieldT::zero();
-
-        // Witness rt. This is not a sanity check.
-        //
-        // This ensures the read gadget constrains
-        // the intended root in the event that
-        // both inputs are zero-valued.
-        zk_merkle_root->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(rt)
-        );
-
-        // Witness public balance values
-        zk_vpub_old.fill_with_bits(
-            this->pb,
-            uint64_to_bool_vector(vpub_old)
-        );
-        zk_vpub_new.fill_with_bits(
-            this->pb,
-            uint64_to_bool_vector(vpub_new)
-        );
-
-        {
-            // Witness total_uint64 bits
-            uint64_t left_side_acc = vpub_old;
-            for (size_t i = 0; i < 2; i++) {
-                left_side_acc += inputs[i].note.value;
-            }
-
-            zk_total_uint64.fill_with_bits(
-                this->pb,
-                uint64_to_bool_vector(left_side_acc)
-            );
-        }
-
-        // Witness phi
-        zk_phi->bits.fill_with_bits(
-            this->pb,
-            uint252_to_bool_vector(phi)
-        );
-
-        // Witness h_sig
-        zk_h_sig->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(h_sig)
-        );
-
-        for (size_t i = 0; i < 2; i++) {
-            // Witness the input information.
-            auto merkle_path = inputs[i].witness.path();
-            zk_input_notes[i]->generate_r1cs_witness(
-                merkle_path,
-                inputs[i].key,
-                inputs[i].note
-            );
-
-            // Witness macs
-            zk_mac_authentication[i]->generate_r1cs_witness();
-        }
-
-        for (size_t i = 0; i < 2; i++) {
-            // Witness the output information.
-            zk_output_notes[i]->generate_r1cs_witness(outputs[i]);
-        }
-
-        // [SANITY CHECK] Ensure that the intended root
-        // was witnessed by the inputs, even if the read
-        // gadget overwrote it. This allows the prover to
-        // fail instead of the verifier, in the event that
-        // the roots of the inputs do not match the
-        // treestate provided to the proving API.
-        zk_merkle_root->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(rt)
-        );
-
-        // This happens last, because only by now are all the
-        // verifier inputs resolved.
-        unpacker->generate_r1cs_witness_from_bits();
-    }
-
-    static r1cs_primary_input<FieldT> witness_map(
-        const uint256& rt,
-        const uint256& h_sig,
-        const boost::array<uint256, 2>& macs,
-        const boost::array<uint256, 2>& nullifiers,
-        const boost::array<uint256, 2>& commitments,
-        uint64_t vpub_old,
-        uint64_t vpub_new
-    ) {
-        std::vector<bool> verify_inputs;
-
-        insert_uint256(verify_inputs, rt);
-        insert_uint256(verify_inputs, h_sig);
-
-        for (size_t i = 0; i < 2; i++) {
-            insert_uint256(verify_inputs, nullifiers[i]);
-            insert_uint256(verify_inputs, macs[i]);
-        }
-
-        for (size_t i = 0; i < 2; i++) {
-            insert_uint256(verify_inputs, commitments[i]);
-        }
-
-        insert_uint64(verify_inputs, vpub_old);
-        insert_uint64(verify_inputs, vpub_new);
-
-        assert(verify_inputs.size() == verifying_input_bit_size());
-        auto verify_field_elements = pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
-        assert(verify_field_elements.size() == verifying_field_element_size());
-        return verify_field_elements;
-    }
-
-    static size_t verifying_input_bit_size() {
-        size_t acc = 0;
-
-        acc += 256; // the merkle root (anchor)
-        acc += 256; // h_sig
-        for (size_t i = 0; i < 2; i++) {
-            acc += 256; // nullifier
-            acc += 256; // mac
-        }
-        for (size_t i = 0; i < 2; i++) {
-            acc += 256; // new commitment
-        }
-        acc += 64; // vpub_old
-        acc += 64; // vpub_new
-
-        return acc;
-    }
-
-    static size_t verifying_field_element_size() {
-        return div_ceil(verifying_input_bit_size(), FieldT::capacity());
-    }
-
-    void alloc_uint256(
-        pb_variable_array<FieldT>& packed_into,
-        std::shared_ptr<digest_variable<FieldT>>& var
-    ) {
-        var.reset(new digest_variable<FieldT>(this->pb, 256, ""));
-        packed_into.insert(packed_into.end(), var->bits.begin(), var->bits.end());
-    }
-
-    void alloc_uint64(
-        pb_variable_array<FieldT>& packed_into,
-        pb_variable_array<FieldT>& integer
-    ) {
-        integer.allocate(this->pb, 64, "");
-        packed_into.insert(packed_into.end(), integer.begin(), integer.end());
-    }
-};
 
 
 struct joinsplit_impl : public stealth_joinsplit
 {
-    typedef default_r1cs_ppzksnark_pp ppzksnark_ppT;
-    typedef Fr<ppzksnark_ppT> FieldT;
+    typedef libsnark::default_r1cs_ppzksnark_pp ppzksnark_ppT;
+    typedef libsnark::Fr<ppzksnark_ppT> FieldT;
 
-    boost::optional<r1cs_ppzksnark_proving_key<ppzksnark_ppT>> pk;
-    boost::optional<r1cs_ppzksnark_verification_key<ppzksnark_ppT>> vk;
+    boost::optional<libsnark::r1cs_ppzksnark_proving_key<ppzksnark_ppT>> pk;
+    boost::optional<libsnark::r1cs_ppzksnark_verification_key<ppzksnark_ppT>> vk;
     boost::optional<std::string> pkPath;
 
     joinsplit_impl() {}
@@ -1057,16 +758,16 @@ struct joinsplit_impl : public stealth_joinsplit
         ppzksnark_ppT::init_public_params();
     }
 
-    void setProvingKeyPath(std::string path) {
+    void set_proving_key_path(std::string path) {
         pkPath = path;
     }
 
-    void loadProvingKey() {
+    void load_proving_key() {
         if (!pk) {
             if (!pkPath) {
                 throw std::runtime_error("proving key path unknown");
             }
-            loadFromFile(*pkPath, pk);
+            load_from_file(*pkPath, pk);
         }
     }
 
@@ -1096,8 +797,8 @@ struct joinsplit_impl : public stealth_joinsplit
         save_to_file(path, r1cs);
     }
 
-    r1cs_constraint_system<FieldT> generate_r1cs() {
-        protoboard<FieldT> pb;
+    libsnark::r1cs_constraint_system<FieldT> generate_r1cs() {
+        libsnark::protoboard<FieldT> pb;
 
         joinsplit_gadget<FieldT> g(pb);
         g.generate_r1cs_constraints();
@@ -1106,9 +807,9 @@ struct joinsplit_impl : public stealth_joinsplit
     }
 
     void generate_impl() {
-        const r1cs_constraint_system<FieldT> constraint_system = generate_r1cs();
-        r1cs_ppzksnark_keypair<ppzksnark_ppT> keypair =
-                r1cs_ppzksnark_generator<ppzksnark_ppT>(constraint_system);
+        const libsnark::r1cs_constraint_system<FieldT> constraint_system = generate_r1cs();
+        libsnark::r1cs_ppzksnark_keypair<ppzksnark_ppT> keypair =
+                libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(constraint_system);
 
         pk = keypair.pk;
         vk = keypair.vk;
@@ -1120,8 +821,8 @@ struct joinsplit_impl : public stealth_joinsplit
                const boost::array<fc::uint256, 2> &hmacs,
                const boost::array<fc::uint256, 2> &nullifiers,
                const boost::array<fc::uint256, 2> &commitments,
-               uint64 vpub_old,
-               uint64 vpub_new,
+               u_int64_t vpub_old,
+               u_int64_t vpub_new,
                const fc::uint256 &rt)
     {
         if (!vk) {
@@ -1129,21 +830,22 @@ struct joinsplit_impl : public stealth_joinsplit
         }
 
         try {
-            auto r1cs_proof = proof.to_libsnark_proof<r1cs_ppzksnark_proof<ppzksnark_ppT>>();
+            auto r1cs_proof =
+                    proof.to_libsnark_proof<libsnark::r1cs_ppzksnark_proof<ppzksnark_ppT>>();
 
-            fc::uint256 h_sig = this->h_sig(randomSeed, nullifiers, pubKeyHash);
+            fc::uint256 h_sig = this->h_sig(random_seed, nullifiers, public_key_hash);
 
             auto witness = joinsplit_gadget<FieldT>::witness_map(
                 rt,
                 h_sig,
-                macs,
+                hmacs,
                 nullifiers,
                 commitments,
                 vpub_old,
                 vpub_new
             );
 
-            return r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(*vk, witness, r1cs_proof);
+            return libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(*vk, witness, r1cs_proof);
         } catch (...) {
             return false;
         }
@@ -1160,8 +862,8 @@ struct joinsplit_impl : public stealth_joinsplit
             boost::array<fc::uint256, 2> &out_hmacs,
             boost::array<fc::uint256, 2> &out_nullifiers,
             boost::array<fc::uint256, 2> &out_commitments,
-            uint64 vpub_old,
-            uint64 vpub_new,
+            u_int64_t vpub_old,
+            u_int64_t vpub_new,
             const fc::uint256 &rt,
             bool compute_proof)
     {
@@ -1169,41 +871,25 @@ struct joinsplit_impl : public stealth_joinsplit
             throw std::runtime_error("JoinSplit proving key not loaded");
         }
 
-        if (vpub_old > MAX_MONEY) {
-            throw std::invalid_argument("nonsensical vpub_old value");
-        }
-
-        if (vpub_new > MAX_MONEY) {
-            throw std::invalid_argument("nonsensical vpub_new value");
-        }
-
-        uint64 lhs_value = vpub_old;
-        uint64 rhs_value = vpub_new;
+        u_int64_t lhs_value = vpub_old;
+        u_int64_t rhs_value = vpub_new;
 
         for (size_t i = 0; i < 2; i++) {
             // Sanity checks of input
             {
                 // If note has nonzero value, its witness's root must be equal to the
                 // input.
-                if ((inputs[i].note.value != 0) && (inputs[i].witness.root() != rt)) {
+                if ((inputs[i].note.amount.amount != 0) && (inputs[i].witness.root() != rt)) {
                     throw std::invalid_argument("joinsplit not anchored to the correct root");
                 }
 
                 // Ensure we have the key to this note.
-                if (inputs[i].note.a_pk != inputs[i].key.address().a_pk) {
+                if (inputs[i].note.paying_key != inputs[i].spending_key.address().paying_key) {
                     throw std::invalid_argument("input note not authorized to spend with given key");
                 }
 
-                // Balance must be sensical
-                if (inputs[i].note.value > MAX_MONEY) {
-                    throw std::invalid_argument("nonsensical input note value");
-                }
+                lhs_value += inputs[i].note.amount.amount.value;
 
-                lhs_value += inputs[i].note.value;
-
-                if (lhs_value > MAX_MONEY) {
-                    throw std::invalid_argument("nonsensical left hand size of joinsplit balance");
-                }
             }
 
             // Compute nullifier of input
@@ -1211,31 +897,21 @@ struct joinsplit_impl : public stealth_joinsplit
         }
 
         // Sample randomSeed
-        out_randomSeed = random_uint256();
+        out_random_seed = random_uint256();
 
         // Compute h_sig
-        uint256 h_sig = this->h_sig(out_randomSeed, out_nullifiers, pubKeyHash);
+        fc::uint256 h_sig = this->h_sig(out_random_seed, out_nullifiers, public_key_hash);
 
         // Sample phi
-        uint252 phi = random_uint252();
+        fc::uint256 phi = random_uint256();
 
         // Compute notes for outputs
-        for (size_t i = 0; i < NumOutputs; i++) {
-            // Sanity checks of output
-            {
-                if (outputs[i].value > MAX_MONEY) {
-                    throw std::invalid_argument("nonsensical output value");
-                }
-
-                rhs_value += outputs[i].value;
-
-                if (rhs_value > MAX_MONEY) {
-                    throw std::invalid_argument("nonsensical right hand side of joinsplit balance");
-                }
-            }
+        for (size_t i = 0; i < 2; i++)
+        {
+            rhs_value += outputs[i].value.amount.value;
 
             // Sample r
-            uint256 r = random_uint256();
+            fc::uint256 r = random_uint256();
 
             out_notes[i] = outputs[i].note(phi, r, i, h_sig);
         }
@@ -1245,38 +921,38 @@ struct joinsplit_impl : public stealth_joinsplit
         }
 
         // Compute the output commitments
-        for (size_t i = 0; i < NumOutputs; i++) {
-            out_commitments[i] = out_notes[i].cm();
+        for (size_t i = 0; i < 2; i++) {
+            out_commitments[i] = out_notes[i].commitment();
         }
 
         // Encrypt the ciphertexts containing the note
         // plaintexts to the recipients of the value.
         {
-            ZCNoteEncryption encryptor(h_sig);
+            stealth_note_encryption encryptor(h_sig);
 
-            for (size_t i = 0; i < NumOutputs; i++) {
-                NotePlaintext pt(out_notes[i], outputs[i].memo);
+            for (size_t i = 0; i < 2; i++) {
+                stealth_note_plaintext pt(out_notes[i], outputs[i].memo);
 
-                out_ciphertexts[i] = pt.encrypt(encryptor, outputs[i].addr.pk_enc);
+                out_ciphertexts[i] = pt.encrypt(encryptor, outputs[i].address.transmission_key);
             }
 
-            out_ephemeralKey = encryptor.get_epk();
+            out_ephemeral_key = encryptor.ephemeral_public_key;
         }
 
         // Authenticate h_sig with each of the input
         // spending keys, producing macs which protect
         // against malleability.
-        for (size_t i = 0; i < NumInputs; i++) {
-            out_macs[i] = PRF_pk(inputs[i].key, i, h_sig);
+        for (size_t i = 0; i < 2; i++) {
+            out_hmacs[i] = PRF_pk(inputs[i].spending_key.value, i, h_sig);
         }
 
-        if (!computeProof) {
-            return ZCProof();
+        if (!compute_proof) {
+            return stealth_proof();
         }
 
-        protoboard<FieldT> pb;
+        libsnark::protoboard<FieldT> pb;
         {
-            joinsplit_gadget<FieldT, NumInputs, NumOutputs> g(pb);
+            joinsplit_gadget<FieldT> g(pb);
             g.generate_r1cs_constraints();
             g.generate_r1cs_witness(
                 phi,
@@ -1303,7 +979,7 @@ struct joinsplit_impl : public stealth_joinsplit
         // estimate that it doesn't matter if we check every time.
         pb.constraint_system.swap_AB_if_beneficial();
 
-        return ZCProof(r1cs_ppzksnark_prover<ppzksnark_ppT>(
+        return stealth_proof(libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
             *pk,
             primary_input,
             aux_input,

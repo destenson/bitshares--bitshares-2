@@ -36,6 +36,13 @@ typedef std::vector<char> binary;
 fc::uint256 random_uint256();
 binary random_binary(size_t size);
 fc::uint256 combine256(const fc::uint256 &v1, const fc::uint256 &v2);
+std::vector<unsigned char> convert_int_to_bytes_vector(const u_int64_t& val_int);
+std::vector<bool> convert_bytes_vector_to_bool_vector(const std::vector<unsigned char>& bytes);
+u_int64_t convert_bool_vector_to_int(const std::vector<bool>& v);
+std::vector<bool> convert_int_to_bool_vector(const u_int64_t& val_int);
+std::vector<bool> convert_uint256_to_bool_vector(const fc::uint256& val);
+void insert_uint256(std::vector<bool>& into, fc::uint256 from);
+void insert_uint64(std::vector<bool>& into, u_int64_t from);
 
 struct stealth_payment_address
 {
@@ -238,10 +245,12 @@ bool operator==(const stealth_incremental_witness<Depth>& a,
             a.cursor_depth == b.cursor_depth);
 }
 
-typedef stealth_incremental_witness<29> incremental_witness;
-typedef stealth_incremental_merkle_tree<29> merkle_tree;
-typedef stealth_incremental_witness<4> test_incremental_witness;
-typedef stealth_incremental_merkle_tree<4> test_merkle_tree;
+#define INCREMENTAL_MERKLE_TREE_DEPTH 29
+#define INCREMENTAL_TEST_MERKLE_TREE_DEPTH 4
+typedef stealth_incremental_witness<INCREMENTAL_MERKLE_TREE_DEPTH> incremental_witness;
+typedef stealth_incremental_merkle_tree<INCREMENTAL_MERKLE_TREE_DEPTH> merkle_tree;
+typedef stealth_incremental_witness<INCREMENTAL_TEST_MERKLE_TREE_DEPTH> test_incremental_witness;
+typedef stealth_incremental_merkle_tree<INCREMENTAL_TEST_MERKLE_TREE_DEPTH> test_merkle_tree;
 
 struct stealth_input
 {
@@ -271,168 +280,11 @@ struct stealth_output
                       const fc::uint256& h_sig) const;
 };
 
-typedef unsigned long long uint64;
-
-const unsigned char G1_PREFIX_MASK = 0x02;
-const unsigned char G2_PREFIX_MASK = 0x0a;
-
-// Element in the base field
-struct Fq
-{
-    fc::uint256 data;
-
-    template<typename libsnark_Fq>
-    Fq(libsnark_Fq element);
-
-    template<typename libsnark_Fq>
-    libsnark_Fq to_libsnark_fq() const;
-};
-
-// Element in the extension field
-struct Fq2
-{
-    fc::uint256 data;
-
-    template<typename libsnark_Fq2>
-    Fq2(libsnark_Fq2 element);
-
-    template<typename libsnark_Fq2>
-    libsnark_Fq2 to_libsnark_fq2() const;
-};
-
-// Compressed point in G1
-struct CompressedG1
-{
-    bool y_lsb;
-    Fq x;
-
-    CompressedG1() : y_lsb(false), x() { }
-
-    template<typename libsnark_G1>
-    CompressedG1(libsnark_G1 point);
-
-    template<typename libsnark_G1>
-    libsnark_G1 to_libsnark_g1() const;
-};
-
-// Compressed point in G2
-struct CompressedG2
-{
-    bool y_gt;
-    Fq2 x;
-
-    CompressedG2() : y_gt(false), x() { }
-
-    template<typename libsnark_G2>
-    CompressedG2(libsnark_G2 point);
-
-    template<typename libsnark_G2>
-    libsnark_G2 to_libsnark_g2() const;
-};
-
-struct stealth_proof
-{
-    CompressedG1 g_A;
-    CompressedG1 g_A_prime;
-    CompressedG2 g_B;
-    CompressedG1 g_B_prime;
-    CompressedG1 g_C;
-    CompressedG1 g_C_prime;
-    CompressedG1 g_K;
-    CompressedG1 g_H;
-
-    // Produces a compressed proof using a libsnark zkSNARK proof
-    template<typename libsnark_proof>
-    stealth_proof(const libsnark_proof& proof);
-
-    // Produces a libsnark zkSNARK proof out of this proof,
-    // or throws an exception if it is invalid.
-    template<typename libsnark_proof>
-    libsnark_proof to_libsnark_proof() const;
-
-    static stealth_proof random_invalid();
-};
-
-struct stealth_joinsplit
-{
-    static stealth_joinsplit* generate();
-    static stealth_joinsplit* unopened();
-
-    static fc::uint256 h_sig(const fc::uint256& random_seed,
-                             const boost::array<fc::uint256, 2>& nullifiers,
-                             const fc::uint256& public_key_hash);
-
-    virtual stealth_proof prove(
-        const boost::array<stealth_input, 2>& inputs,
-        const boost::array<stealth_output, 2>& outputs,
-        boost::array<stealth_note, 2>& out_notes,
-        boost::array<binary, 2>& out_ciphertexts,
-        fc::ecc::public_key& out_ephemeral_key,
-        const fc::uint256& public_key_hash,
-        fc::uint256& out_random_seed,
-        boost::array<fc::uint256, 2>& out_hmacs,
-        boost::array<fc::uint256, 2>& out_nullifiers,
-        boost::array<fc::uint256, 2>& out_commitments,
-        uint64 vpub_old,
-        uint64 vpub_new,
-        const fc::uint256& rt,
-        bool compute_proof = true
-    ) = 0;
-
-    virtual bool verify(
-        const stealth_proof& proof,
-        const fc::uint256& public_key_hash,
-        const fc::uint256& random_seed,
-        const boost::array<fc::uint256, 2>& hmacs,
-        const boost::array<fc::uint256, 2>& nullifiers,
-        const boost::array<fc::uint256, 2>& commitments,
-        uint64 vpub_old,
-        uint64 vpub_new,
-        const fc::uint256& rt
-    ) = 0;
-};
 
 struct stealth_transfer_operation : public base_operation
 {
    asset fee;
-   boost::array<stealth_input, 2> inputs;
-   boost::array<stealth_output, 2> outputs;
 
-   static stealth_transfer_operation Generate();
-   static stealth_transfer_operation Unopened();
-   static fc::uint256 h_sig(const fc::uint256& random_seed,
-                        const boost::array<fc::uint256, 2>& nullifiers,
-                        const fc::uint256& public_key_hash
-                       );
-
-   stealth_proof prove(
-       const boost::array<stealth_input, 2>& inputs,
-       const boost::array<stealth_output, 2>& outputs,
-       boost::array<stealth_note, 2>& notes,
-       boost::array<binary, 2>& ciphertexts,
-       fc::uint256& ephemeral_key,
-       const fc::uint256& public_key_hash,
-       fc::uint256& random_seed,
-       boost::array<fc::uint256, 2>& hmacs,
-       boost::array<fc::uint256, 2>& nullifiers,
-       boost::array<fc::uint256, 2>& commitments,
-       uint64 vpub_old,
-       uint64 vpub_new,
-       const fc::uint256& nullifier_base,
-       bool compute_proof = true
-   );
-
-   bool verify(
-       const stealth_proof& proof,
-       const fc::uint256& public_key_hash,
-       const fc::uint256& random_seed,
-       const boost::array<fc::uint256, 2>& hmacs,
-       const boost::array<fc::uint256, 2>& nullifiers,
-       const boost::array<fc::uint256, 2>& commitments,
-       uint64 vpub_old,
-       uint64 vpub_new,
-       const fc::uint256& nullifier_base
-   );
    /** graphene TEMP account */
    account_id_type fee_payer()const;
    void            validate()const;
