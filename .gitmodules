@@ -6,6 +6,3 @@
     path = libraries/fc
     url = https://github.com/cryptonomex/fc.git
     ignore = dirty
-[submodule "libsnark"]
-	path = libsnark
-	url = https://github.com/kenCode-de/libsnark
