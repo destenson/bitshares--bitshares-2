@@ -37,6 +37,7 @@ namespace graphene { namespace chain {
 // helper functions
 /////////////////////////////////////////////////////////////
 
+fc::uint256 test;
 
 fc::uint256 random_uint256()
 {

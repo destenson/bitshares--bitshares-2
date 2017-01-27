@@ -29,6 +29,7 @@
 #include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/protocol/stealth_zk.hpp>
+#include <graphene/chain/protocol/stealth_snark.hpp>
 #include <fc/crypto/sha256.hpp>
 #include <iostream>
 
@@ -202,7 +203,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     boost::array<binary, 2> ciphertexts;
     stealth_proof proof;
 
-    stealth_joinsplit js;
+    stealth_joinsplit* js = stealth_joinsplit::generate();
 
     {
         boost::array<stealth_input, 2> inputs = {
@@ -218,7 +219,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         boost::array<stealth_note, 2> output_notes;
 
         // Perform the proof
-        proof = js.prove(
+        proof = js->prove(
             inputs,
             outputs,
             output_notes,
@@ -236,7 +237,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     }
 
     // Verify the transaction:
-    BOOST_REQUIRE(js.verify(
+    BOOST_REQUIRE(js->verify(
         proof,
         pubKeyHash,
         randomSeed,
@@ -250,7 +251,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 
     // Recipient should decrypt
     // Now the recipient should spend the money again
-    auto h_sig = js.h_sig(randomSeed, nullifiers, pubKeyHash);
+    auto h_sig = js->h_sig(randomSeed, nullifiers, pubKeyHash);
     stealth_note_decryption decryptor(recipient_key.viewing_key().value);
 
     auto note_pt = stealth_note_plaintext::decrypt(
@@ -292,7 +293,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         boost::array<stealth_note, 2> output_notes;
 
         // Perform the proof
-        proof = js.prove(
+        proof = js->prove(
             inputs,
             outputs,
             output_notes,
@@ -310,7 +311,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     }
 
     // Verify the transaction:
-    BOOST_REQUIRE(js.verify(
+    BOOST_REQUIRE(js->verify(
         proof,
         pubKeyHash,
         randomSeed,
