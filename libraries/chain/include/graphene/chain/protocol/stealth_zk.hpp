@@ -289,7 +289,7 @@ struct stealth_transfer_operation : public base_operation
    account_id_type fee_payer()const;
    void            validate()const;
    share_type      calculate_fee()const;
-   asset fee2;
+
 };
 
 }}
