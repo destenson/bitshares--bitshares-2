@@ -184,13 +184,16 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {
 
     // The recipient's information.
+    std::cout << "Generate recepient information..." << std::endl;
     stealth_spending_key recipient_key = stealth_spending_key::random();
     stealth_payment_address recipient_addr = recipient_key.address();
 
     // Create the commitment tree
+    std::cout << "Create merkle tree..." << std::endl;
     merkle_tree tree;
 
     // Set up a JoinSplit description
+    std::cout << "Prepare proof params..." << std::endl;
     fc::ecc::public_key ephemeralKey;
     fc::uint256 randomSeed;
     uint64_t vpub_old = 10;
@@ -203,6 +206,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     boost::array<binary, 2> ciphertexts;
     stealth_proof proof;
 
+    std::cout << "Generate joinsplit..." << std::endl;
     stealth_joinsplit* js = stealth_joinsplit::generate();
 
     {
@@ -219,6 +223,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         boost::array<stealth_note, 2> output_notes;
 
         // Perform the proof
+        std::cout << "Perform the proof..." << std::endl;
         proof = js->prove(
             inputs,
             outputs,
@@ -237,6 +242,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     }
 
     // Verify the transaction:
+    std::cout << "Verify the transaction..." << std::endl;
     BOOST_REQUIRE(js->verify(
         proof,
         pubKeyHash,
@@ -251,9 +257,12 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 
     // Recipient should decrypt
     // Now the recipient should spend the money again
+    std::cout << "Get hsig..." << std::endl;
     auto h_sig = js->h_sig(randomSeed, nullifiers, pubKeyHash);
+    std::cout << "Create decryptor..." << std::endl;
     stealth_note_decryption decryptor(recipient_key.viewing_key().value);
 
+    std::cout << "<decrypt note..." << std::endl;
     auto note_pt = stealth_note_plaintext::decrypt(
         decryptor,
         ciphertexts[0],
@@ -267,6 +276,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     BOOST_REQUIRE(decrypted_note.amount.amount == 10);
 
     // Insert the commitments from the last tx into the tree
+    std::cout << "Insert the commitments from the last tx into the tree..." << std::endl;
     tree.append(commitments[0]);
     auto witness_recipient = tree.witness();
     tree.append(commitments[1]);
@@ -293,6 +303,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         boost::array<stealth_note, 2> output_notes;
 
         // Perform the proof
+        std::cout << "Perform the proof..." << std::endl;
         proof = js->prove(
             inputs,
             outputs,
@@ -311,6 +322,7 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     }
 
     // Verify the transaction:
+    std::cout << "Verify the transaction..." << std::endl;
     BOOST_REQUIRE(js->verify(
         proof,
         pubKeyHash,
