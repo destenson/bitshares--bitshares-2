@@ -56,6 +56,9 @@ struct stealth_viewing_key
 {
     fc::ecc::private_key value;
 
+    stealth_viewing_key() : value (fc::ecc::private_key::generate()) {}
+    stealth_viewing_key(const fc::ecc::private_key& v) : value(v) {}
+
     fc::ecc::public_key transmission_key() const;
 };
 
@@ -260,7 +263,16 @@ struct stealth_input
 
     fc::uint256 nullifier() const;
 
-    stealth_input() {}
+    stealth_input(): witness(merkle_tree().witness()),
+        spending_key(stealth_spending_key::random())
+    {
+        note = stealth_note(spending_key.address().paying_key, asset(),
+                            random_uint256(), random_uint256());
+        merkle_tree dummy_tree;
+        dummy_tree.append(note.commitment());
+        witness = dummy_tree.witness();
+        \
+    }
     stealth_input(incremental_witness w, stealth_note n,
                   stealth_spending_key sk) :
         witness(w), note(n), spending_key(sk) {}
@@ -272,7 +284,7 @@ struct stealth_output
     asset value;
     binary memo;
 
-    stealth_output() {}
+    stealth_output(): address(stealth_spending_key::random().address()) {}
     stealth_output(stealth_payment_address a, asset v) : address(a), value(v){}
 
     stealth_note note(const fc::uint256& phi,

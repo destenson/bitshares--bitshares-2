@@ -395,8 +395,12 @@ public:
     }
 
     void generate_r1cs_witness(const stealth_note& note) {
-        r->bits.fill_with_bits(this->pb, convert_uint256_to_bool_vector(note.trapdoor));
-        value.fill_with_bits(this->pb, convert_int_to_bool_vector(note.amount.amount.value));
+        std::vector<bool> bits = convert_uint256_to_bool_vector(note.trapdoor);
+        std::cout << "r->bits Size:" << r->bits.size() << "(" << bits.size() << ")" << std::endl;
+        r->bits.fill_with_bits(this->pb, bits);
+        bits = convert_int_to_bool_vector(note.amount.amount.value);
+        std::cout << "value Size:" << value.size() << "(" << bits.size() << ")" << std::endl;
+        value.fill_with_bits(this->pb, bits);
     }
 };
 
@@ -484,7 +488,7 @@ public:
         std::shared_ptr<libsnark::digest_variable<FieldT>> nullifier,
         libsnark::digest_variable<FieldT> rt
     ) : note_gadget<FieldT>(pb) {
-        a_sk.reset(new libsnark::digest_variable<FieldT>(pb, 252, ""));
+        a_sk.reset(new libsnark::digest_variable<FieldT>(pb, 256, ""));
         a_pk.reset(new libsnark::digest_variable<FieldT>(pb, 256, ""));
         rho.reset(new libsnark::digest_variable<FieldT>(pb, 256, ""));
         commitment.reset(new libsnark::digest_variable<FieldT>(pb, 256, ""));
@@ -558,24 +562,30 @@ public:
         note_gadget<FieldT>::generate_r1cs_witness(note);
 
         // Witness a_sk for the input
+        std::vector<bool> bits = convert_uint256_to_bool_vector(key.value.get_secret());
+        std::cout << "a_sk->bits Size:" << a_sk->bits.size() << "(" << bits.size() << ")" << std::endl;
         a_sk->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(key.value.get_secret())
+            bits
         );
 
         // Witness a_pk for a_sk with PRF_addr
         spend_authority->generate_r1cs_witness();
 
         // [SANITY CHECK] Witness a_pk with note information
+        bits = convert_uint256_to_bool_vector(note.paying_key);
+        std::cout << "a_pk->bits Size:" << a_pk->bits.size() << "(" << bits.size() << ")" << std::endl;
         a_pk->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(note.paying_key)
+            bits
         );
 
         // Witness rho for the input note
+        bits = convert_uint256_to_bool_vector(note.trapdoor);
+        std::cout << "rho->bits Size:" << rho->bits.size() << "(" << bits.size() << ")" << std::endl;
         rho->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(note.trapdoor)
+            bits
         );
 
         // Witness the nullifier for the input note
@@ -586,9 +596,11 @@ public:
 
         // [SANITY CHECK] Ensure the commitment is
         // valid.
+        bits = convert_uint256_to_bool_vector(note.commitment());
+        std::cout << "commitment->bits Size:" << commitment->bits.size() << "(" << bits.size() << ")" << std::endl;
         commitment->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(note.commitment())
+            bits
         );
 
         // Set enforce flag for nonzero input value
@@ -664,14 +676,18 @@ public:
 
         // [SANITY CHECK] Witness rho ourselves with the
         // note information.
+        std::vector<bool> bits = convert_uint256_to_bool_vector(note.nullifier_base);
+        std::cout << "rho->bits Size:" << rho->bits.size() << "(" << bits.size() << ")" << std::endl;
         rho->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(note.nullifier_base)
+            bits
         );
 
+        bits = convert_uint256_to_bool_vector(note.paying_key);
+        std::cout << "a_pk->bits Size:" << a_pk->bits.size() << "(" << bits.size() << ")" << std::endl;
         a_pk->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(note.paying_key)
+            bits
         );
 
         commit_to_outputs->generate_r1cs_witness();
@@ -755,7 +771,7 @@ public:
         // to be one automatically for us, and is known as `ONE`.
         ZERO.allocate(pb);
 
-        zk_phi.reset(new libsnark::digest_variable<FieldT>(pb, 252, ""));
+        zk_phi.reset(new libsnark::digest_variable<FieldT>(pb, 256, ""));
 
         zk_total_uint64.allocate(pb, 64);
 
@@ -871,19 +887,25 @@ public:
         // This ensures the read gadget constrains
         // the intended root in the event that
         // both inputs are zero-valued.
+        std::vector<bool> bits = convert_uint256_to_bool_vector(rt);
+        std::cout << "zk_merkle_root->bits Size:" << zk_merkle_root->bits.size() << "(" << bits.size() << ")" << std::endl;
         zk_merkle_root->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(rt)
+            bits
         );
 
         // Witness public balance values
+        bits = convert_int_to_bool_vector(vpub_old);
+        std::cout << "zk_vpub_old Size:" << zk_vpub_old.size() << "(" << bits.size() << ")" << std::endl;
         zk_vpub_old.fill_with_bits(
             this->pb,
-            convert_int_to_bool_vector(vpub_old)
+            bits
         );
+        bits = convert_int_to_bool_vector(vpub_new);
+        std::cout << "zk_vpub_new Size:" << zk_vpub_new.size() << "(" << bits.size() << ")" << std::endl;
         zk_vpub_new.fill_with_bits(
             this->pb,
-            convert_int_to_bool_vector(vpub_new)
+            bits
         );
 
         {
@@ -893,22 +915,28 @@ public:
                 left_side_acc += inputs[i].note.amount.amount.value;
             }
 
+            bits = convert_int_to_bool_vector(left_side_acc);
+            std::cout << "zk_total_uint64 Size:" << zk_total_uint64.size() << "(" << bits.size() << ")" << std::endl;
             zk_total_uint64.fill_with_bits(
                 this->pb,
-                convert_int_to_bool_vector(left_side_acc)
+                bits
             );
         }
 
         // Witness phi
+        bits = convert_uint256_to_bool_vector(phi);
+        std::cout << "zk_phi->bits Size:" << zk_phi->bits.size() << "(" << bits.size() << ")" << std::endl;
         zk_phi->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(phi)
+            bits
         );
 
         // Witness h_sig
+        bits = convert_uint256_to_bool_vector(h_sig);
+        std::cout << "zk_h_sig->bits Size:" << zk_h_sig->bits.size() << "(" << bits.size() << ")" << std::endl;
         zk_h_sig->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(h_sig)
+            bits
         );
 
         for (size_t i = 0; i < 2; i++) {
@@ -935,9 +963,11 @@ public:
         // fail instead of the verifier, in the event that
         // the roots of the inputs do not match the
         // treestate provided to the proving API.
+        bits = convert_uint256_to_bool_vector(rt);
+        std::cout << "zk_merkle_root->bits Size:" << zk_merkle_root->bits.size() << "(" << bits.size() << ")" << std::endl;
         zk_merkle_root->bits.fill_with_bits(
             this->pb,
-            convert_uint256_to_bool_vector(rt)
+            bits
         );
 
         // This happens last, because only by now are all the

@@ -210,7 +210,7 @@ stealth_spending_key stealth_spending_key::random()
 stealth_viewing_key stealth_spending_key::viewing_key() const
 {
     return stealth_viewing_key(
-        {stealth_note_encryption::generate_secret_key(*this)}
+        stealth_note_encryption::generate_secret_key(*this)
                 );
 }
 
