@@ -241,7 +241,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    auto processed_trx = _apply_transaction( trx );
    _pending_tx.push_back(processed_trx);
 
-   notify_changed_objects();
+   // notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
    temp_session.merge();
 
@@ -546,7 +546,7 @@ void database::_apply_block( const signed_block& next_block )
 
 void database::notify_changed_objects()
 { try {
-   if( _undo_db.enabled() ) 
+   if( _undo_db.enabled() )
    {
       const auto& head_undo = _undo_db.head();
       vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
@@ -556,10 +556,11 @@ void database::notify_changed_objects()
       removed.reserve( head_undo.removed.size() );
       for( const auto& item : head_undo.removed )
       {
-         changed_ids.push_back( item.first );
+        //  changed_ids.push_back( item.first );
          removed.emplace_back( item.second.get() );
       }
       changed_objects(changed_ids);
+      removed_objects(removed);
    }
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -667,7 +668,7 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    FC_ASSERT( head_block_time() < next_block.timestamp, "", ("head_block_time",head_block_time())("next",next_block.timestamp)("blocknum",next_block.block_num()) );
    const witness_object& witness = next_block.witness(*this);
 
-   if( !(skip&skip_witness_signature) ) 
+   if( !(skip&skip_witness_signature) )
       FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
    if( !(skip&skip_witness_schedule_check) )
