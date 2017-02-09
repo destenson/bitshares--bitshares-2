@@ -6,13 +6,6 @@
 #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
-typedef libsnark::alt_bn128_pp curve_pp;
-typedef libsnark::alt_bn128_pp::G1_type curve_G1;
-typedef libsnark::alt_bn128_pp::G2_type curve_G2;
-typedef libsnark::alt_bn128_pp::GT_type curve_GT;
-typedef libsnark::alt_bn128_pp::Fp_type curve_Fr;
-typedef libsnark::alt_bn128_pp::Fq_type curve_Fq;
-typedef libsnark::alt_bn128_pp::Fqe_type curve_Fq2;
 
 namespace graphene { namespace chain {
 
@@ -43,7 +36,7 @@ template<mp_size_t LIMBS>
 void write_bigint(binary &blob,
                   const libsnark::bigint<LIMBS> &val)
 {
-    if(blob.size() != 8 * LIMBS * sizeof(mp_limb_t))
+    if(blob.size() != LIMBS * sizeof(mp_limb_t))
         throw std::runtime_error("Incorrect bigint blob size");
     auto ptr = blob.begin();
     for (ssize_t i = LIMBS-1; i >= 0; i--, ptr += 8) {
@@ -56,6 +49,21 @@ template<mp_size_t LIMBS>
 void write_bigint(fc::uint256 &blob,
                   const libsnark::bigint<LIMBS> &val)
 {
+    if(blob.data_size() != LIMBS * sizeof(mp_limb_t))
+        throw std::runtime_error("Incorrect bigint blob size");
+    unsigned char* ptr = reinterpret_cast<unsigned char*>(blob.data());
+    for (ssize_t i = LIMBS-1; i >= 0; i--, ptr += 8) {
+        WriteBE64(ptr, val.data[i]);
+    }
+}
+
+// Writes a bigint in big endian
+template<mp_size_t LIMBS>
+void write_bigint(fc::uint512 &blob,
+                  const libsnark::bigint<LIMBS> &val)
+{
+    if(blob.data_size() != LIMBS * sizeof(mp_limb_t))
+        throw std::runtime_error("Incorrect bigint blob size");
     unsigned char* ptr = reinterpret_cast<unsigned char*>(blob.data());
     for (ssize_t i = LIMBS-1; i >= 0; i--, ptr += 8) {
         WriteBE64(ptr, val.data[i]);
@@ -66,7 +74,7 @@ void write_bigint(fc::uint256 &blob,
 template<mp_size_t LIMBS>
 libsnark::bigint<LIMBS> read_bigint(const binary &blob)
 {
-    if(blob.size() != 8 * LIMBS * sizeof(mp_limb_t))
+    if(blob.size() != LIMBS * sizeof(mp_limb_t))
         throw std::runtime_error("Incorrect bigint blob size");    libsnark::bigint<LIMBS> ret;
 
     const char* ptr = blob.data();
@@ -219,18 +227,93 @@ libsnark::r1cs_ppzksnark_proof<curve_pp> stealth_proof::to_libsnark_proof() cons
 
 stealth_proof stealth_proof::random_invalid()
 {
+    std::cout << "Create empty proof..." << std::endl;
     stealth_proof p;
+    std::cout << "set g_A..." << std::endl;
     p.g_A = curve_G1::random_element();
+    std::cout << "set g_A_prime..." << std::endl;
     p.g_A_prime = curve_G1::random_element();
+    std::cout << "set g_B..." << std::endl;
     p.g_B = curve_G2::random_element();
+    std::cout << "set g_B_prime..." << std::endl;
     p.g_B_prime = curve_G1::random_element();
+    std::cout << "set g_C..." << std::endl;
     p.g_C = curve_G1::random_element();
+    std::cout << "set g_C_prime..." << std::endl;
     p.g_C_prime = curve_G1::random_element();
 
+    std::cout << "set g_K..." << std::endl;
     p.g_K = curve_G1::random_element();
+    std::cout << "set g_H..." << std::endl;
     p.g_H = curve_G1::random_element();
 
+    std::cout << "return..." << std::endl;
     return p;
+}
+
+bool operator ==(const stealth_proof &p1, const stealth_proof &p2)
+{
+    return (
+        p1.g_A == p2.g_A &&
+        p1.g_A_prime == p2.g_A_prime &&
+        p1.g_B == p2.g_B &&
+        p1.g_B_prime == p2.g_B_prime &&
+        p1.g_C == p2.g_C &&
+        p1.g_C_prime == p2.g_C_prime &&
+        p1.g_K == p2.g_K &&
+        p1.g_H == p2.g_H
+    );
+}
+
+bool operator !=(const stealth_proof &p1, const stealth_proof &p2)
+{
+    return !(p1 == p2);
+}
+
+bool operator ==(const CompressedG2 &p1, const CompressedG2 &p2)
+{
+    return (
+        p1.y_gt == p2.y_gt &&
+        p1.x == p2.x
+    );
+}
+
+bool operator !=(const CompressedG2 &p1, const CompressedG2 &p2)
+{
+    return !(p1 == p2);
+}
+
+bool operator ==(const CompressedG1 &p1, const CompressedG1 &p2)
+{
+    return (
+        p1.y_lsb == p2.y_lsb &&
+        p1.x == p2.x
+                );
+}
+
+bool operator !=(const CompressedG1 &p1, const CompressedG1 &p2)
+{
+    return !(p1 == p2);
+}
+
+bool operator ==(const Fq2 &p1, const Fq2 &p2)
+{
+    return p1.data == p2.data;
+}
+
+bool operator !=(const Fq2 &p1, const Fq2 &p2)
+{
+    return !(p1 == p2);
+}
+
+bool operator ==(const Fq &p1, const Fq &p2)
+{
+    return p1.data == p2.data;
+}
+
+bool operator !=(const Fq &p1, const Fq &p2)
+{
+    return !(p1 == p2);
 }
 
 }}

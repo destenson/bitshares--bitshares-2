@@ -27,6 +27,8 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/dh.hpp>
 #include <fc/crypto/aes.hpp>
+#include <fc/thread/spin_lock.hpp>
+#include <fc/thread/scoped_lock.hpp>
 
 #include <array>
 #include <boost/foreach.hpp>
@@ -703,10 +705,12 @@ template class stealth_incremental_merkle_tree<4>;
 template class stealth_incremental_witness<29>;
 template class stealth_incremental_witness<4>;
 
+fc::spin_lock file_lock;
 
 template<typename T>
-void save_to_file(std::string path, T& obj) {
-
+void save_to_file(std::string path, T& obj)
+{
+    fc::scoped_lock<fc::spin_lock> l(file_lock);
     std::stringstream ss;
     ss << obj;
     std::ofstream fh;
@@ -718,8 +722,9 @@ void save_to_file(std::string path, T& obj) {
 }
 
 template<typename T>
-void load_from_file(std::string path, boost::optional<T>& objIn) {
-
+void load_from_file(std::string path, boost::optional<T>& objIn)
+{
+    fc::scoped_lock<fc::spin_lock> l(file_lock);
     std::stringstream ss;
     std::ifstream fh(path, std::ios::binary);
 

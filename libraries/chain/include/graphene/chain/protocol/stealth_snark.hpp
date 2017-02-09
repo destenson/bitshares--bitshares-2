@@ -36,6 +36,14 @@
 #include "libsnark/common/default_types/r1cs_ppzksnark_pp.hpp"
 #include "libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp"
 
+typedef libsnark::alt_bn128_pp curve_pp;
+typedef libsnark::alt_bn128_pp::G1_type curve_G1;
+typedef libsnark::alt_bn128_pp::G2_type curve_G2;
+typedef libsnark::alt_bn128_pp::GT_type curve_GT;
+typedef libsnark::alt_bn128_pp::Fp_type curve_Fr;
+typedef libsnark::alt_bn128_pp::Fq_type curve_Fq;
+typedef libsnark::alt_bn128_pp::Fqe_type curve_Fq2;
+
 namespace graphene { namespace chain {
 
 const unsigned char G1_PREFIX_MASK = 0x02;
@@ -55,10 +63,13 @@ struct Fq
     libsnark_Fq to_libsnark_fq() const;
 };
 
+bool operator ==(const Fq& p1, const Fq&p2);
+bool operator !=(const Fq& p1, const Fq&p2);
+
 // Element in the extension field
 struct Fq2
 {
-    fc::uint256 data;
+    fc::uint512 data;
 
     Fq2(): data() {}
 
@@ -68,6 +79,9 @@ struct Fq2
     template<typename libsnark_Fq2>
     libsnark_Fq2 to_libsnark_fq2() const;
 };
+
+bool operator ==(const Fq2& p1, const Fq2&p2);
+bool operator !=(const Fq2& p1, const Fq2&p2);
 
 // Compressed point in G1
 struct CompressedG1
@@ -84,6 +98,9 @@ struct CompressedG1
     libsnark_G1 to_libsnark_g1() const;
 };
 
+bool operator ==(const CompressedG1& p1, const CompressedG1&p2);
+bool operator !=(const CompressedG1& p1, const CompressedG1&p2);
+
 // Compressed point in G2
 struct CompressedG2
 {
@@ -98,6 +115,9 @@ struct CompressedG2
     template<typename libsnark_G2>
     libsnark_G2 to_libsnark_g2() const;
 };
+
+bool operator ==(const CompressedG2& p1, const CompressedG2&p2);
+bool operator !=(const CompressedG2& p1, const CompressedG2&p2);
 
 struct stealth_proof
 {
@@ -122,6 +142,9 @@ struct stealth_proof
 
     static stealth_proof random_invalid();
 };
+
+bool operator ==(const stealth_proof& p1, const stealth_proof&p2);
+bool operator !=(const stealth_proof& p1, const stealth_proof&p2);
 
 template<typename T>
 T swap_endianness_u64(T v) {

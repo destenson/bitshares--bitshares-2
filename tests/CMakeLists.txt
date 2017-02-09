@@ -6,6 +6,7 @@ if( GPERFTOOLS_FOUND )
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
 endif()
 
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g" )
 add_executable( stealth_test tests/main.cpp tests/stealth_tests.cpp ${COMMON_SOURCES} )
 target_link_libraries( stealth_test graphene_chain graphene_app graphene_account_history graphene_egenesis_none fc libsnark gmp sodium ${PLATFORM_SPECIFIC_LIBS} )
 

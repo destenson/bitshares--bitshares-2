@@ -179,10 +179,25 @@ BOOST_AUTO_TEST_CASE(stealth_merkle_tree_test)
 } FC_LOG_AND_RETHROW() }
 
 
+BOOST_AUTO_TEST_CASE(stealth_proof_test)
+{ try {
+        libsnark::init_alt_bn128_params();
+        std::cout << "Create random proof..." << std::endl;
+        stealth_proof p1 = stealth_proof::random_invalid();
+        std::cout << "Convert to libsnark form..." << std::endl;
+        libsnark::r1cs_ppzksnark_proof<curve_pp> lsp1 =
+                p1.to_libsnark_proof<libsnark::r1cs_ppzksnark_proof<curve_pp> >();
+        std::cout << "Create proof from libsnark form..." << std::endl;
+        stealth_proof p2(lsp1);
+        std::cout << "Compare 2 proofs..." << std::endl;
+        BOOST_REQUIRE(p1 == p2);
+} FC_LOG_AND_RETHROW() }
+
 
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
-{ try {
+{ try {\
 
+    libsnark::init_alt_bn128_params();
     // The recipient's information.
     std::cout << "Generate recepient information..." << std::endl;
     stealth_spending_key recipient_key = stealth_spending_key::random();
