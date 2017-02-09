@@ -159,6 +159,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       {
          if( !_subscribe_callback )
             return false;
+         idump((i)(_subscribe_filter.contains( i )));
          return _subscribe_filter.contains( i );
       }
 
@@ -478,7 +479,8 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
    }
 
    for( auto i : final_result )
-      subscribe_to_item(i);
+      for( auto ii : final_result )
+         subscribe_to_item( ii );
 
    return final_result;
 }
