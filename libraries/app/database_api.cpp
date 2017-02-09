@@ -159,7 +159,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       {
          if( !_subscribe_callback )
             return false;
-         return true;
          return _subscribe_filter.contains( i );
       }
 
