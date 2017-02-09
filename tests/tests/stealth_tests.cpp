@@ -35,7 +35,6 @@
 
 using namespace graphene::chain;
 
-//BOOST_FIXTURE_TEST_SUITE( stealth_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( stealth_encryption_test )
 { try {
@@ -193,7 +192,81 @@ BOOST_AUTO_TEST_CASE(stealth_proof_test)
         BOOST_REQUIRE(p1 == p2);
 } FC_LOG_AND_RETHROW() }
 
+typedef libsnark::default_r1cs_ppzksnark_pp ppzksnark_ppT;
+typedef libsnark::Fr<ppzksnark_ppT> FieldT;
 
+BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
+{ try {
+        libsnark::init_alt_bn128_params();
+        stealth_spending_key recipient_key = stealth_spending_key::random();
+        stealth_payment_address recipient_addr = recipient_key.address();
+        fc::uint256 phi = random_uint256();
+        merkle_tree tree;
+        fc::uint256 rt = tree.root();
+        fc::uint256 random_seed = random_uint256();
+        fc::uint256 public_key_hash = random_uint256();
+        boost::array<stealth_input, 2> inputs = {
+            stealth_input(), // dummy input
+            stealth_input() // dummy input
+        };
+        boost::array<fc::uint256, 2> nullifiers = {
+            inputs[0].nullifier(),
+            inputs[1].nullifier()
+        };
+        fc::uint256 h_sig = stealth_joinsplit::h_sig(random_seed, nullifiers,
+                                                     public_key_hash);
+        boost::array<stealth_output, 2> outputs = {
+            stealth_output(recipient_addr, asset(10)),
+            stealth_output() // dummy output
+        };
+        boost::array<stealth_note, 2> notes;
+        for (size_t i = 0; i < 2; i++)
+        {
+            fc::uint256 r = random_uint256();
+            notes[i] = outputs[i].note(phi, r, i, h_sig);
+        }
+        uint64_t vpub_old = 10;
+        uint64_t vpub_new = 0;
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> a_sk(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> a_pk(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                PRF_addr_a_pk_gadget<FieldT> g(pb, ZERO, a_sk.bits, a_pk);
+                a_sk.generate_r1cs_constraints();
+                g.generate_r1cs_constraints();
+                a_sk.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(recipient_key.value.get_secret())
+                );
+                g.generate_r1cs_witness();
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            {
+                joinsplit_gadget<FieldT> g(pb);
+                g.generate_r1cs_constraints();
+                g.generate_r1cs_witness(
+                    phi,
+                    rt,
+                    h_sig,
+                    inputs,
+                    notes,
+                    vpub_old,
+                    vpub_new
+                );
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+} FC_LOG_AND_RETHROW() }
+
+/*
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {\
 
@@ -350,6 +423,5 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         rt
     ));
 } FC_LOG_AND_RETHROW() }
-
-//BOOST_AUTO_TEST_SUITE_END()
+*/
 
