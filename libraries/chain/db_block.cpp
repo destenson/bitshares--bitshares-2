@@ -550,16 +550,16 @@ void database::notify_changed_objects()
    {
       const auto& head_undo = _undo_db.head();
       vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
+      vector<object_id_type> new_ids;  new_ids.reserve(head_undo.new_ids.size());
       for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
-      for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
+      for( const auto& item : head_undo.new_ids ) new_ids.push_back(item);
+
       vector<const object*> removed;
       removed.reserve( head_undo.removed.size() );
-      for( const auto& item : head_undo.removed )
-      {
-        //  changed_ids.push_back( item.first );
-         removed.emplace_back( item.second.get() );
-      }
+      for( const auto& item : head_undo.removed ) removed.emplace_back( item.second.get() );
+
       changed_objects(changed_ids);
+      created_objects(new_ids);
       removed_objects(removed);
    }
 } FC_CAPTURE_AND_RETHROW() }

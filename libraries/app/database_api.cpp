@@ -56,7 +56,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       fc::variants get_objects(const vector<object_id_type>& ids)const;
 
       // Subscriptions
-      void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_removal );
+      void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
       void set_pending_transaction_callback( std::function<void(const variant&)> cb );
       void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
       void cancel_all_subscriptions();
@@ -166,16 +166,18 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       /** called every time a block is applied to report the objects that were changed */
       void on_objects_changed(const vector<object_id_type>& ids);
+      void on_objects_created(const vector<object_id_type>& new_ids);
       void on_objects_removed(const vector<const object*>& objs);
       void on_applied_block();
 
       mutable fc::bloom_filter                               _subscribe_filter;
-      bool                                    _notify_removal = false;
+      bool                                    _notify_remove_create = false;
       std::function<void(const fc::variant&)> _subscribe_callback;
       std::function<void(const fc::variant&)> _pending_trx_callback;
       std::function<void(const fc::variant&)> _block_applied_callback;
 
       boost::signals2::scoped_connection                                                                                           _change_connection;
+      boost::signals2::scoped_connection                                                                                           _create_connection;
       boost::signals2::scoped_connection                                                                                           _removed_connection;
       boost::signals2::scoped_connection                                                                                           _applied_block_connection;
       boost::signals2::scoped_connection                                                                                           _pending_trx_connection;
@@ -199,6 +201,9 @@ database_api_impl::database_api_impl( graphene::chain::database& db ):_db(db)
    wlog("creating database api ${x}", ("x",int64_t(this)) );
    _change_connection = _db.changed_objects.connect([this](const vector<object_id_type>& ids) {
                                 on_objects_changed(ids);
+                                });
+   _create_connection = _db.created_objects.connect([this](const vector<object_id_type>& new_ids) {
+                                on_objects_created(new_ids);
                                 });
    _removed_connection = _db.removed_objects.connect([this](const vector<const object*>& objs) {
                                 on_objects_removed(objs);
@@ -257,15 +262,15 @@ fc::variants database_api_impl::get_objects(const vector<object_id_type>& ids)co
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-void database_api::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_removal )
+void database_api::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
-   my->set_subscribe_callback( cb, notify_removal );
+   my->set_subscribe_callback( cb, notify_remove_create );
 }
 
-void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_removal )
+void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
    _subscribe_callback = cb;
-   _notify_removal = notify_removal;
+   _notify_remove_create = notify_remove_create;
 
    static fc::bloom_parameters param;
    param.projected_element_count    = 10000;
@@ -1784,7 +1789,7 @@ void database_api_impl::on_objects_removed( const vector<const object*>& objs )
     for(const auto obj : objs ) {
        if( _subscribe_callback )
        {
-          if (is_subscribed_to_item(obj->id) || _notify_removal )
+          if (is_subscribed_to_item(obj->id) || _notify_remove_create )
           {
              // idump((obj->id));
              updates.emplace_back( obj->id );
@@ -1827,22 +1832,22 @@ void database_api_impl::on_objects_removed( const vector<const object*>& objs )
     });
 }
 
-void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
+void database_api_impl::on_objects_created(const vector<object_id_type>& new_ids)
 {
     vector<variant>    updates;
     map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
 
-    if (ids.size() == 0) return;
+    if (new_ids.size() == 0) return;
 
-    for(auto id : ids)
+    for(auto new_id : new_ids)
     {
        const object* obj = nullptr;
        if( _subscribe_callback )
        {
-          obj = _db.find_object( id );
-          if( obj && is_subscribed_to_item(id) )
+          obj = _db.find_object( new_id );
+          if( obj && _notify_remove_create )
           {
-             // idump((id));
+             idump((new_id));
              updates.emplace_back( obj->to_variant() );
           }
        }
@@ -1850,7 +1855,71 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
        if( _market_subscriptions.size() )
        {
           if( !_subscribe_callback )
-             obj = _db.find_object( id );
+             obj = _db.find_object( new_id );
+          if( obj )
+          {
+             const limit_order_object* order = dynamic_cast<const limit_order_object*>(obj);
+             if( order )
+             {
+                auto sub = _market_subscriptions.find( order->get_market() );
+                if( sub != _market_subscriptions.end() )
+                   market_broadcast_queue[order->get_market()].emplace_back( order->id );
+             }
+             else
+             {
+                const call_order_object* call_order = dynamic_cast<const call_order_object*>(obj);
+                if (call_order)
+                {
+                  auto sub = _market_subscriptions.find( call_order->get_market() );
+                  if( sub != _market_subscriptions.end() )
+                     market_broadcast_queue[call_order->get_market()].emplace_back( call_order->id );
+                }
+            }
+         }
+       }
+    }
+
+   auto capture_this = shared_from_this();
+
+   /// pushing the future back / popping the prior future if it is complete.
+   /// if a connection hangs then this could get backed up and result in
+   /// a failure to exit cleanly.
+   fc::async([capture_this,this,updates,market_broadcast_queue](){
+      if( _subscribe_callback && updates.size() ) _subscribe_callback( updates );
+
+      for( const auto& item : market_broadcast_queue )
+      {
+        auto sub = _market_subscriptions.find(item.first);
+        if( sub != _market_subscriptions.end() )
+            sub->second( fc::variant(item.second ) );
+      }
+   });
+}
+
+void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
+{
+    vector<variant>    updates;
+    map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
+
+    if (ids.size() == 0) return;
+
+    for(auto changed_id : ids)
+    {
+       const object* obj = nullptr;
+       if( _subscribe_callback )
+       {
+          obj = _db.find_object( changed_id );
+          if( obj && is_subscribed_to_item(changed_id) )
+          {
+             idump((changed_id));
+             updates.emplace_back( obj->to_variant() );
+          }
+       }
+
+       if( _market_subscriptions.size() )
+       {
+          if( !_subscribe_callback )
+             obj = _db.find_object( changed_id );
           if( obj )
           {
              const limit_order_object* order = dynamic_cast<const limit_order_object*>(obj);

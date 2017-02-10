@@ -51,6 +51,7 @@ public:
 private:
 
    void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids );
+   void on_created_objects( const std::vector<graphene::db::object_id_type>& new_ids );
    void on_removed_objects( const std::vector<const graphene::db::object*> objs );
    void on_applied_block( const graphene::chain::signed_block& b );
 
@@ -61,6 +62,7 @@ private:
    std::shared_ptr< std::ofstream > _json_object_stream;
    boost::signals2::scoped_connection _applied_block_conn;
    boost::signals2::scoped_connection _changed_objects_conn;
+   boost::signals2::scoped_connection _created_objects_conn;
    boost::signals2::scoped_connection _removed_objects_conn;
 };
 

@@ -195,6 +195,11 @@ namespace graphene { namespace chain {
           */
          fc::signal<void(const vector<object_id_type>&)> changed_objects;
 
+         /** this signal is emitted any time an object is created and contains references
+          *  to the ids of every object that was created.
+          */
+         fc::signal<void(const vector<object_id_type>&)>  created_objects;
+
          /** this signal is emitted any time an object is removed and contains a
           * pointer to the last value of every object that was removed.
           */
@@ -304,7 +309,7 @@ namespace graphene { namespace chain {
           * to newly created VBID and return it.
           *
           * Otherwise, credit amount to ovbid.
-          * 
+          *
           * @return ID of newly created VBO, but only if VBO was created.
           */
          optional< vesting_balance_id_type > deposit_lazy_vesting(
