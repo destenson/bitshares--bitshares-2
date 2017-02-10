@@ -147,9 +147,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          if( !_subscribe_callback )
             return;
 
+         idump((i)(is_subscribed_to_item(i)));
          if( !is_subscribed_to_item(i) )
          {
-            idump((i));
             _subscribe_filter.insert( vec.data(), vec.size() );//(vecconst char*)&i, sizeof(i) );
          }
       }
@@ -159,7 +159,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       {
          if( !_subscribe_callback )
             return false;
-         idump((i)(_subscribe_filter.contains( i )));
          return _subscribe_filter.contains( i );
       }
 
@@ -234,7 +233,7 @@ fc::variants database_api_impl::get_objects(const vector<object_id_type>& ids)co
       {
          if( id.type() == operation_history_object_type && id.space() == protocol_ids ) continue;
          if( id.type() == impl_account_transaction_history_object_type && id.space() == implementation_ids ) continue;
-
+         idump((id)(is_subscribed_to_item(id)));
          this->subscribe_to_item( id );
       }
    }
@@ -479,8 +478,8 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
    }
 
    for( auto i : final_result )
-      for( auto ii : final_result )
-         subscribe_to_item( ii );
+      for( auto ii : i )
+         this->subscribe_to_item( ii );
 
    return final_result;
 }
@@ -538,8 +537,8 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       if( subscribe )
       {
-         ilog( "subscribe to ${id}", ("id",account->name) );
-         subscribe_to_item( account->id );
+         ilog( "subscribe to ${name} with id ${id}", ("name",account->name)("id",account->id) );
+         this->subscribe_to_item( account->id );
       }
 
       // fc::mutable_variant_object full_account;
@@ -1785,7 +1784,7 @@ void database_api_impl::on_objects_removed( const vector<const object*>& objs )
     for(const auto obj : objs ) {
        if( _subscribe_callback )
        {
-          if (_notify_removal || is_subscribed_to_item(obj->id) )
+          if (is_subscribed_to_item(obj->id) || _notify_removal )
           {
              // idump((obj->id));
              updates.emplace_back( obj->id );
@@ -1799,8 +1798,17 @@ void database_api_impl::on_objects_removed( const vector<const object*>& objs )
           {
              auto sub = _market_subscriptions.find( order->get_market() );
              if( sub != _market_subscriptions.end() )
-             // idump((order->id));
-             market_broadcast_queue[order->get_market()].emplace_back( order->id );
+                market_broadcast_queue[order->get_market()].emplace_back( order->id );
+          }
+          else
+          {
+             const call_order_object* call_order = dynamic_cast<const call_order_object*>(obj);
+             if (call_order)
+             {
+                auto sub = _market_subscriptions.find( call_order->get_market() );
+                if( sub != _market_subscriptions.end() )
+                   market_broadcast_queue[call_order->get_market()].emplace_back( call_order->id );
+             }
           }
        }
     }
@@ -1852,7 +1860,17 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
                 if( sub != _market_subscriptions.end() )
                    market_broadcast_queue[order->get_market()].emplace_back( order->id );
              }
-          }
+             else
+             {
+                const call_order_object* call_order = dynamic_cast<const call_order_object*>(obj);
+                if (call_order)
+                {
+                  auto sub = _market_subscriptions.find( call_order->get_market() );
+                  if( sub != _market_subscriptions.end() )
+                     market_broadcast_queue[call_order->get_market()].emplace_back( call_order->id );
+                }
+            }
+         }
        }
     }
 
@@ -1862,7 +1880,7 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
    /// if a connection hangs then this could get backed up and result in
    /// a failure to exit cleanly.
    fc::async([capture_this,this,updates,market_broadcast_queue](){
-      if( _subscribe_callback ) _subscribe_callback( updates );
+      if( _subscribe_callback && updates.size() ) _subscribe_callback( updates );
 
       for( const auto& item : market_broadcast_queue )
       {
