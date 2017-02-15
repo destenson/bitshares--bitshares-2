@@ -3,8 +3,8 @@
 #include <fc/crypto/dh.hpp>
 #include <fc/crypto/aes.hpp>
 
-#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
 
 namespace graphene { namespace chain {

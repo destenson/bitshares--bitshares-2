@@ -30,11 +30,11 @@
 #include <boost/optional.hpp>
 #include <boost/foreach.hpp>
 
-#include "libsnark/gadgetlib1/gadgets/basic_gadgets.hpp"
-#include "libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp"
-#include "libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp"
-#include "libsnark/common/default_types/r1cs_ppzksnark_pp.hpp"
-#include "libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp"
+#include <gadgetlib1/gadgets/basic_gadgets.hpp>
+#include <gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
+#include <gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
+#include <common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
 typedef libsnark::alt_bn128_pp curve_pp;
 typedef libsnark::alt_bn128_pp::G1_type curve_G1;
@@ -551,7 +551,8 @@ public:
         ));
     }
 
-    void generate_r1cs_constraints() {
+    void generate_r1cs_constraints()
+    {
         note_gadget<FieldT>::generate_r1cs_constraints();
 
         a_sk->generate_r1cs_constraints();
@@ -585,46 +586,38 @@ public:
         note_gadget<FieldT>::generate_r1cs_witness(note);
 
         // Witness a_sk for the input
-        std::vector<bool> bits = convert_uint256_to_bool_vector(key.value.get_secret());
-        std::cout << "a_sk->bits Size:" << a_sk->bits.size() << "(" << bits.size() << ")" << std::endl;
         a_sk->bits.fill_with_bits(
             this->pb,
-            bits
+            convert_uint256_to_bool_vector(key.value.get_secret())
+        );
+
+        // [SANITY CHECK] Witness a_pk with note information
+        a_pk->bits.fill_with_bits(
+            this->pb,
+            convert_uint256_to_bool_vector(note.paying_key)
         );
 
         // Witness a_pk for a_sk with PRF_addr
         spend_authority->generate_r1cs_witness();
 
-        // [SANITY CHECK] Witness a_pk with note information
-        bits = convert_uint256_to_bool_vector(note.paying_key);
-        std::cout << "a_pk->bits Size:" << a_pk->bits.size() << "(" << bits.size() << ")" << std::endl;
-        a_pk->bits.fill_with_bits(
-            this->pb,
-            bits
-        );
-
         // Witness rho for the input note
-        bits = convert_uint256_to_bool_vector(note.trapdoor);
-        std::cout << "rho->bits Size:" << rho->bits.size() << "(" << bits.size() << ")" << std::endl;
         rho->bits.fill_with_bits(
             this->pb,
-            bits
+            convert_uint256_to_bool_vector(note.trapdoor)
         );
 
         // Witness the nullifier for the input note
         expose_nullifiers->generate_r1cs_witness();
 
-        // Witness the commitment of the input note
-        commit_to_inputs->generate_r1cs_witness();
-
         // [SANITY CHECK] Ensure the commitment is
         // valid.
-        bits = convert_uint256_to_bool_vector(note.commitment());
-        std::cout << "commitment->bits Size:" << commitment->bits.size() << "(" << bits.size() << ")" << std::endl;
         commitment->bits.fill_with_bits(
             this->pb,
-            bits
+            convert_uint256_to_bool_vector(note.commitment())
         );
+
+        // Witness the commitment of the input note
+        commit_to_inputs->generate_r1cs_witness();
 
         // Set enforce flag for nonzero input value
         this->pb.val(value_enforce) = (note.amount.amount != 0) ?

@@ -249,6 +249,183 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
         }
         {
             libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> a_sk(pb,  256, "");
+                libsnark::digest_variable<FieldT> rho(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> nullifier(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                PRF_nf_gadget<FieldT> g(pb, ZERO, a_sk.bits, rho.bits, nullifier);
+                a_sk.generate_r1cs_constraints();
+                rho.generate_r1cs_constraints();
+                g.generate_r1cs_constraints();
+                a_sk.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(recipient_key.value.get_secret())
+                );
+                rho.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(notes[0].trapdoor)
+                );
+                g.generate_r1cs_witness();
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> a_sk(pb,  256, "");
+                libsnark::digest_variable<FieldT> h_sig_bits(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> result(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                PRF_pk_gadget<FieldT> g(pb, ZERO, a_sk.bits, h_sig_bits.bits, false, result);
+                a_sk.generate_r1cs_constraints();
+                h_sig_bits.generate_r1cs_constraints();
+                g.generate_r1cs_constraints();
+                a_sk.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(recipient_key.value.get_secret())
+                );
+                h_sig_bits.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(h_sig)
+                );
+                g.generate_r1cs_witness();
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> phi_bits(pb,  256, "");
+                libsnark::digest_variable<FieldT> h_sig_bits(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> result(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                PRF_rho_gadget<FieldT> g(pb, ZERO, phi_bits.bits, h_sig_bits.bits, false, result);
+                phi_bits.generate_r1cs_constraints();
+                h_sig_bits.generate_r1cs_constraints();
+                g.generate_r1cs_constraints();
+                phi_bits.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(phi)
+                );
+                h_sig_bits.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(h_sig)
+                );
+                g.generate_r1cs_witness();
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> a_pk(pb,  256, "");
+                libsnark::pb_variable_array<FieldT> value;
+                value.allocate(pb, 64);
+                libsnark::digest_variable<FieldT> rho_bits(pb,  256, "");
+                libsnark::digest_variable<FieldT> r(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> result(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                note_commitment_gadget<FieldT> g(
+                            pb, ZERO, a_pk.bits, value, rho_bits.bits, r.bits, result
+                            );
+
+                for (size_t i = 0; i < 64; i++) {
+                    libsnark::generate_boolean_r1cs_constraint<FieldT>(
+                        pb,
+                        value[i],
+                        "boolean_value"
+                    );
+                }
+
+                r.generate_r1cs_constraints();
+
+                g.generate_r1cs_constraints();
+
+                g.generate_r1cs_witness();
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            {
+                note_gadget<FieldT> g(pb);
+                g.generate_r1cs_constraints();
+                g.generate_r1cs_witness(notes[0]);
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> commitment(pb,  256, "");
+                libsnark::pb_variable_array<FieldT> value;
+                value.allocate(pb, 64);
+                libsnark::pb_variable<FieldT> value_enforced;
+                value_enforced.allocate(pb);
+                libsnark::digest_variable<FieldT> rt(pb,  256, "");
+                merkle_tree_gadget<FieldT> g(
+                            pb, commitment, rt, value_enforced
+                            );
+
+                for (size_t i = 0; i < 64; i++) {
+                    libsnark::generate_boolean_r1cs_constraint<FieldT>(
+                        pb,
+                        value[i],
+                        "boolean_value"
+                    );
+                }
+                libsnark::generate_boolean_r1cs_constraint<FieldT>(pb, value_enforced,"");
+                pb.add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                            packed_addition(value),
+                            (1 - value_enforced),
+                            0
+                        ), "");
+
+                g.generate_r1cs_constraints();
+
+                auto merkle_path = inputs[0].witness.path();
+                g.generate_r1cs_witness(merkle_path);
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                std::shared_ptr<libsnark::digest_variable<FieldT>> nullifier(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                libsnark::digest_variable<FieldT> rt(pb,  256, "");
+                input_note_gadget<FieldT> g(
+                            pb, ZERO, nullifier, rt
+                            );
+                rt.generate_r1cs_constraints();
+                auto merkle_path = inputs[0].witness.path();
+                auto rt_val = inputs[0].witness.root();
+                rt.bits.fill_with_bits(pb, convert_uint256_to_bool_vector(rt_val));
+                g.generate_r1cs_constraints();
+                g.generate_r1cs_witness(merkle_path, recipient_key, notes[0]);
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
             {
                 joinsplit_gadget<FieldT> g(pb);
                 g.generate_r1cs_constraints();
