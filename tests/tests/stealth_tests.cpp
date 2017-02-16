@@ -426,6 +426,34 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
         }
         {
             libsnark::protoboard<FieldT> pb;
+            libsnark::pb_variable<FieldT> ZERO;
+            ZERO.allocate(pb);
+            {
+                libsnark::digest_variable<FieldT> phi_bits(pb,  256, "");
+                libsnark::digest_variable<FieldT> h_sig_bits(pb,  256, "");
+                std::shared_ptr<libsnark::digest_variable<FieldT>> result(
+                            new libsnark::digest_variable<FieldT>(pb,  256, "")
+                                );
+                output_note_gadget<FieldT> g(
+                            pb, ZERO, phi_bits.bits, h_sig_bits.bits, false, result
+                            );
+                phi_bits.generate_r1cs_constraints();
+                h_sig_bits.generate_r1cs_constraints();
+                g.generate_r1cs_constraints();
+                phi_bits.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(phi)
+                );
+                h_sig_bits.bits.fill_with_bits(
+                    pb,
+                    convert_uint256_to_bool_vector(h_sig)
+                );
+                g.generate_r1cs_witness(notes[0]);
+            }
+            BOOST_REQUIRE(pb.is_satisfied());
+        }
+        {
+            libsnark::protoboard<FieldT> pb;
             {
                 joinsplit_gadget<FieldT> g(pb);
                 g.generate_r1cs_constraints();
@@ -443,7 +471,7 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
         }
 } FC_LOG_AND_RETHROW() }
 
-/*
+
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {\
 
@@ -600,5 +628,5 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         rt
     ));
 } FC_LOG_AND_RETHROW() }
-*/
+
 
