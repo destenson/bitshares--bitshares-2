@@ -1047,8 +1047,8 @@ public:
 
 struct stealth_joinsplit
 {
-    static stealth_joinsplit* generate();
-    static stealth_joinsplit* unopened();
+    static std::unique_ptr<stealth_joinsplit> generate();
+    static std::unique_ptr<stealth_joinsplit> unopened();
 
     static fc::uint256 h_sig(const fc::uint256& random_seed,
                              const boost::array<fc::uint256, 2>& nullifiers,
@@ -1082,6 +1082,12 @@ struct stealth_joinsplit
         u_int64_t vpub_new,
         const fc::uint256& rt
     ) = 0;
+
+    // key's loading
+    virtual void load_proving_key(std::string path) = 0;
+    virtual void save_proving_key(std::string path) = 0;
+    virtual void load_verifying_key(std::string path) = 0; \
+    virtual void save_verifying_key(std::string path) = 0; \
 };
 
 }}

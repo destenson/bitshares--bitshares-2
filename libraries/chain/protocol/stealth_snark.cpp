@@ -198,13 +198,21 @@ curve_G2 CompressedG2::to_libsnark_g2() const
 template<>
 stealth_proof::stealth_proof(const libsnark::r1cs_ppzksnark_proof<curve_pp> &proof)
 {
+    std::cout << "g_A..." << std::endl;
     g_A = CompressedG1(proof.g_A.g);
+    std::cout << "g_A_prime..." << std::endl;
     g_A_prime = CompressedG1(proof.g_A.h);
+    std::cout << "g_B..." << std::endl;
     g_B = CompressedG2(proof.g_B.g);
+    std::cout << "g_B_prime..." << std::endl;
     g_B_prime = CompressedG1(proof.g_B.h);
+    std::cout << "g_C..." << std::endl;
     g_C = CompressedG1(proof.g_C.g);
+    std::cout << "g_C_prime..." << std::endl;
     g_C_prime = CompressedG1(proof.g_C.h);
+    std::cout << "g_K..." << std::endl;
     g_K = CompressedG1(proof.g_K);
+    std::cout << "g_H..." << std::endl;
     g_H = CompressedG1(proof.g_H);
 }
 
@@ -227,27 +235,17 @@ libsnark::r1cs_ppzksnark_proof<curve_pp> stealth_proof::to_libsnark_proof() cons
 
 stealth_proof stealth_proof::random_invalid()
 {
-    std::cout << "Create empty proof..." << std::endl;
     stealth_proof p;
-    std::cout << "set g_A..." << std::endl;
     p.g_A = curve_G1::random_element();
-    std::cout << "set g_A_prime..." << std::endl;
     p.g_A_prime = curve_G1::random_element();
-    std::cout << "set g_B..." << std::endl;
     p.g_B = curve_G2::random_element();
-    std::cout << "set g_B_prime..." << std::endl;
     p.g_B_prime = curve_G1::random_element();
-    std::cout << "set g_C..." << std::endl;
     p.g_C = curve_G1::random_element();
-    std::cout << "set g_C_prime..." << std::endl;
     p.g_C_prime = curve_G1::random_element();
 
-    std::cout << "set g_K..." << std::endl;
     p.g_K = curve_G1::random_element();
-    std::cout << "set g_H..." << std::endl;
     p.g_H = curve_G1::random_element();
 
-    std::cout << "return..." << std::endl;
     return p;
 }
 

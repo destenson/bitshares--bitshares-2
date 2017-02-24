@@ -751,7 +751,6 @@ struct joinsplit_impl : public stealth_joinsplit
 
     boost::optional<libsnark::r1cs_ppzksnark_proving_key<ppzksnark_ppT>> pk;
     boost::optional<libsnark::r1cs_ppzksnark_verification_key<ppzksnark_ppT>> vk;
-    boost::optional<std::string> pkPath;
 
     joinsplit_impl() {}
     ~joinsplit_impl() {}
@@ -762,20 +761,13 @@ struct joinsplit_impl : public stealth_joinsplit
         ppzksnark_ppT::init_public_params();
     }
 
-    void set_proving_key_path(std::string path) {
-        pkPath = path;
+    virtual void load_proving_key(std::string path) override
+    {
+        load_from_file(path, pk);
     }
 
-    void load_proving_key() {
-        if (!pk) {
-            if (!pkPath) {
-                throw std::runtime_error("proving key path unknown");
-            }
-            load_from_file(*pkPath, pk);
-        }
-    }
-
-    void save_proving_key(std::string path) {
+    virtual void save_proving_key(std::string path) override
+    {
         if (pk) {
             save_to_file(path, *pk);
         } else {
@@ -783,11 +775,13 @@ struct joinsplit_impl : public stealth_joinsplit
         }
     }
 
-    void load_verifying_key(std::string path) {
+    virtual void load_verifying_key(std::string path) override
+    {
         load_from_file(path, vk);
     }
 
-    void save_verifying_key(std::string path) {
+    virtual void save_verifying_key(std::string path) override
+    {
         if (vk) {
             save_to_file(path, *vk);
         } else {
@@ -819,7 +813,7 @@ struct joinsplit_impl : public stealth_joinsplit
         vk = keypair.vk;
     }
 
-    bool verify(const stealth_proof &proof,
+    virtual bool verify(const stealth_proof &proof,
                const fc::uint256 &public_key_hash,
                const fc::uint256 &random_seed,
                const boost::array<fc::uint256, 2> &hmacs,
@@ -827,7 +821,7 @@ struct joinsplit_impl : public stealth_joinsplit
                const boost::array<fc::uint256, 2> &commitments,
                u_int64_t vpub_old,
                u_int64_t vpub_new,
-               const fc::uint256 &rt)
+               const fc::uint256 &rt) override
     {
         if (!vk) {
             throw std::runtime_error("JoinSplit verifying key not loaded");
@@ -855,7 +849,7 @@ struct joinsplit_impl : public stealth_joinsplit
         }
     }
 
-    stealth_proof prove(
+    virtual stealth_proof prove(
             const boost::array<stealth_input, 2> &inputs,
             const boost::array<stealth_output, 2> &outputs,
             boost::array<stealth_note, 2> &out_notes,
@@ -869,7 +863,7 @@ struct joinsplit_impl : public stealth_joinsplit
             u_int64_t vpub_old,
             u_int64_t vpub_new,
             const fc::uint256 &rt,
-            bool compute_proof)
+            bool compute_proof) override
     {
         if (compute_proof && !pk) {
             throw std::runtime_error("JoinSplit proving key not loaded");
@@ -878,6 +872,7 @@ struct joinsplit_impl : public stealth_joinsplit
         u_int64_t lhs_value = vpub_old;
         u_int64_t rhs_value = vpub_new;
 
+        std::cout << "input sanity checks" << std::endl;
         for (size_t i = 0; i < 2; i++) {
             // Sanity checks of input
             {
@@ -909,6 +904,7 @@ struct joinsplit_impl : public stealth_joinsplit
         // Sample phi
         fc::uint256 phi = random_uint256();
 
+        std::cout << "Compute notes for outputs" << std::endl;
         // Compute notes for outputs
         for (size_t i = 0; i < 2; i++)
         {
@@ -924,11 +920,13 @@ struct joinsplit_impl : public stealth_joinsplit
             throw std::invalid_argument("invalid joinsplit balance");
         }
 
+        std::cout << "Compute the output commitments" << std::endl;
         // Compute the output commitments
         for (size_t i = 0; i < 2; i++) {
             out_commitments[i] = out_notes[i].commitment();
         }
 
+        std::cout << "Encrypt the ciphertexts" << std::endl;
         // Encrypt the ciphertexts containing the note
         // plaintexts to the recipients of the value.
         {
@@ -943,6 +941,7 @@ struct joinsplit_impl : public stealth_joinsplit
             out_ephemeral_key = encryptor.ephemeral_public_key;
         }
 
+        std::cout << "Authenticate h_sig with each of the input spending keys" << std::endl;
         // Authenticate h_sig with each of the input
         // spending keys, producing macs which protect
         // against malleability.
@@ -954,6 +953,7 @@ struct joinsplit_impl : public stealth_joinsplit
             return stealth_proof();
         }
 
+        std::cout << "Use gadgets" << std::endl;
         libsnark::protoboard<FieldT> pb;
         {
             joinsplit_gadget<FieldT> g(pb);
@@ -983,6 +983,7 @@ struct joinsplit_impl : public stealth_joinsplit
         // estimate that it doesn't matter if we check every time.
         pb.constraint_system.swap_AB_if_beneficial();
 
+        std::cout << "return proof" << std::endl;
         return stealth_proof(libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
             *pk,
             primary_input,
@@ -993,18 +994,19 @@ struct joinsplit_impl : public stealth_joinsplit
 };
 
 
-stealth_joinsplit* stealth_joinsplit::generate()
+std::unique_ptr<stealth_joinsplit> stealth_joinsplit::generate()
 {
     joinsplit_impl::initialize();
-    auto js = new joinsplit_impl();
+    joinsplit_impl* js = new joinsplit_impl();
     js->generate_impl();
-    return js;
+    std::unique_ptr<stealth_joinsplit> res(js);
+    return res;
 }
 
-stealth_joinsplit* stealth_joinsplit::unopened()
+std::unique_ptr<stealth_joinsplit> stealth_joinsplit::unopened()
 {
     joinsplit_impl::initialize();
-    return new joinsplit_impl();
+    return std::unique_ptr<stealth_joinsplit>(new joinsplit_impl());
 }
 
 fc::uint256 stealth_joinsplit::h_sig(const fc::uint256 &random_seed,
