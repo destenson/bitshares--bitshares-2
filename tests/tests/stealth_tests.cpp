@@ -474,21 +474,18 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_generation )
 { try {\
     libsnark::init_alt_bn128_params();
-    {
-/*        std::cout << "Generate joinsplit..." << std::endl;
-        std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
-        std::cout << "Save generated keys..." << std::endl;
-        js->save_proving_key("proving.key");
-        js->save_verifying_key("verifying.key");*/
-    }
+    std::cout << "Generate joinsplit..." << std::endl;
+    std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
+    std::cout << "Save generated keys..." << std::endl;
+    js->save_proving_key("proving.key");
+    js->save_verifying_key("verifying.key");
 
-    {
-        std::cout << "Create joinsplit..." << std::endl;
-        std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::unopened();
-        std::cout << "Load generated keys..." << std::endl;
-        js->load_proving_key("proving.key");
-        js->load_verifying_key("verifying.key");
-    }
+    std::cout << "Create joinsplit..." << std::endl;
+    std::unique_ptr<stealth_joinsplit> js2 = stealth_joinsplit::unopened();
+    std::cout << "Load generated keys..." << std::endl;
+    js2->load_proving_key("proving.key");
+    js2->load_verifying_key("verifying.key");
+    BOOST_REQUIRE(js->is_equal(*js2.get()));
 } FC_LOG_AND_RETHROW() }
 
 

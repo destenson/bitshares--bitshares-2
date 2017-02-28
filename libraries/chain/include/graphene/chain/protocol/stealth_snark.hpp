@@ -1088,6 +1088,7 @@ struct stealth_joinsplit
     virtual void save_proving_key(std::string path) = 0;
     virtual void load_verifying_key(std::string path) = 0; \
     virtual void save_verifying_key(std::string path) = 0; \
+    virtual bool is_equal(const stealth_joinsplit& other) = 0;
 };
 
 }}

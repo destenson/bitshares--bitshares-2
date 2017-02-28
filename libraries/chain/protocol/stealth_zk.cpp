@@ -711,12 +711,9 @@ template<typename T>
 void save_to_file(std::string path, T& obj)
 {
     fc::scoped_lock<fc::spin_lock> l(file_lock);
-    std::stringstream ss;
-    ss << obj;
     std::ofstream fh;
     fh.open(path, std::ios::binary);
-    ss.rdbuf()->pubseekpos(0, std::ios_base::out);
-    fh << ss.rdbuf();
+    fh << obj;
     fh.flush();
     fh.close();
 }
@@ -725,20 +722,14 @@ template<typename T>
 void load_from_file(std::string path, boost::optional<T>& objIn)
 {
     fc::scoped_lock<fc::spin_lock> l(file_lock);
-    std::stringstream ss;
     std::ifstream fh(path, std::ios::binary);
 
     if(!fh.is_open()) {
         throw std::runtime_error("could not load param file at %s");
     }
 
-    ss << fh.rdbuf();
-    fh.close();
-
-    ss.rdbuf()->pubseekpos(0, std::ios_base::in);
-
     T obj;
-    ss >> obj;
+    fh >> obj;
 
     objIn = std::move(obj);
 }
@@ -990,6 +981,12 @@ struct joinsplit_impl : public stealth_joinsplit
             aux_input,
             pb.constraint_system
         ));
+    }
+
+    bool is_equal(const stealth_joinsplit& other) override
+    {
+        const joinsplit_impl& obj = dynamic_cast<const joinsplit_impl&> (other);
+        return ((obj.pk == pk) && (obj.vk == vk));
     }
 };
 
