@@ -962,6 +962,10 @@ struct joinsplit_impl : public stealth_joinsplit
                 vpub_old,
                 vpub_new
             );
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            pk = keypair.pk;
+            vk = keypair.vk;
+            vk_precomp = r1cs_ppzksnark_verifier_process_vk(*vk);
         }
 
         // The constraint system must be satisfied or there is an unimplemented

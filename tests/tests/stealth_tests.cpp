@@ -613,10 +613,10 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     stealth_proof proof;
 
     std::cout << "Generate joinsplit..." << std::endl;
-    std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
- /*   std::cout << "Load generated keys..." << std::endl;
+    std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::unopened();
+    std::cout << "Load generated keys..." << std::endl;
     js->load_proving_key("proving.key");
-    js->load_verifying_key("verifying.key");*/
+    js->load_verifying_key("verifying.key");
 
     {
         boost::array<stealth_input, 2> inputs = {
