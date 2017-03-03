@@ -748,6 +748,10 @@ public:
             pb.set_input_sizes(verifying_field_element_size());
 
             alloc_uint256(zk_unpacked_inputs, zk_merkle_root);
+
+            alloc_uint64(zk_unpacked_inputs, zk_vpub_old);
+            alloc_uint64(zk_unpacked_inputs, zk_vpub_new);
+
             alloc_uint256(zk_unpacked_inputs, zk_h_sig);
 
             for (size_t i = 0; i < 2; i++) {
@@ -758,9 +762,6 @@ public:
             for (size_t i = 0; i < 2; i++) {
                 alloc_uint256(zk_unpacked_inputs, zk_output_commitments[i]);
             }
-
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_old);
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_new);
 
             assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
 
@@ -985,6 +986,10 @@ public:
         std::vector<bool> verify_inputs;
 
         insert_uint256(verify_inputs, rt);
+
+        insert_uint64(verify_inputs, vpub_old);
+        insert_uint64(verify_inputs, vpub_new);
+
         insert_uint256(verify_inputs, h_sig);
 
         for (size_t i = 0; i < 2; i++) {
@@ -995,9 +1000,6 @@ public:
         for (size_t i = 0; i < 2; i++) {
             insert_uint256(verify_inputs, commitments[i]);
         }
-
-        insert_uint64(verify_inputs, vpub_old);
-        insert_uint64(verify_inputs, vpub_new);
 
         assert(verify_inputs.size() == verifying_input_bit_size());
         auto verify_field_elements =
@@ -1010,6 +1012,8 @@ public:
         size_t acc = 0;
 
         acc += 256; // the merkle root (anchor)
+        acc += 64; // vpub_old
+        acc += 64; // vpub_new
         acc += 256; // h_sig
         for (size_t i = 0; i < 2; i++) {
             acc += 256; // nullifier
@@ -1018,8 +1022,6 @@ public:
         for (size_t i = 0; i < 2; i++) {
             acc += 256; // new commitment
         }
-        acc += 64; // vpub_old
-        acc += 64; // vpub_new
 
         return acc;
     }

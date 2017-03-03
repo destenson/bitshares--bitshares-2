@@ -735,6 +735,7 @@ void load_from_file(std::string path, boost::optional<T>& objIn)
 }
 
 
+
 struct joinsplit_impl : public stealth_joinsplit
 {
     typedef libsnark::default_r1cs_ppzksnark_pp ppzksnark_ppT;
@@ -742,6 +743,7 @@ struct joinsplit_impl : public stealth_joinsplit
 
     boost::optional<libsnark::r1cs_ppzksnark_proving_key<ppzksnark_ppT>> pk;
     boost::optional<libsnark::r1cs_ppzksnark_verification_key<ppzksnark_ppT>> vk;
+    boost::optional<libsnark::r1cs_ppzksnark_processed_verification_key<ppzksnark_ppT>> vk_precomp;
 
     joinsplit_impl() {}
     ~joinsplit_impl() {}
@@ -769,6 +771,7 @@ struct joinsplit_impl : public stealth_joinsplit
     virtual void load_verifying_key(std::string path) override
     {
         load_from_file(path, vk);
+        vk_precomp = r1cs_ppzksnark_verifier_process_vk(*vk);
     }
 
     virtual void save_verifying_key(std::string path) override
@@ -802,6 +805,7 @@ struct joinsplit_impl : public stealth_joinsplit
 
         pk = keypair.pk;
         vk = keypair.vk;
+        vk_precomp = r1cs_ppzksnark_verifier_process_vk(*vk);
     }
 
     virtual bool verify(const stealth_proof &proof,
@@ -834,7 +838,7 @@ struct joinsplit_impl : public stealth_joinsplit
                 vpub_new
             );
 
-            return libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(*vk, witness, r1cs_proof);
+            return libsnark::r1cs_ppzksnark_online_verifier_strong_IC<ppzksnark_ppT>(*vk_precomp, witness, r1cs_proof);
         } catch (...) {
             return false;
         }

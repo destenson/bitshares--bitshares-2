@@ -196,9 +196,53 @@ BOOST_AUTO_TEST_CASE(stealth_proof_test)
 typedef libsnark::default_r1cs_ppzksnark_pp ppzksnark_ppT;
 typedef libsnark::Fr<ppzksnark_ppT> FieldT;
 
-BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
+BOOST_AUTO_TEST_CASE( stealth_keys_generation )
+{ try {\
+    if(!boost::filesystem::exists("proving.key") ||
+       !boost::filesystem::exists("verifying.key"))
+    {
+        libsnark::init_alt_bn128_params();
+        std::cout << "Generate joinsplit..." << std::endl;
+        std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
+        std::cout << "Save generated keys..." << std::endl;
+        js->save_proving_key("proving.key");
+        js->save_verifying_key("verifying.key");
+
+        std::cout << "Create joinsplit..." << std::endl;
+        std::unique_ptr<stealth_joinsplit> js2 = stealth_joinsplit::unopened();
+        std::cout << "Load generated keys..." << std::endl;
+        js2->load_proving_key("proving.key");
+        js2->load_verifying_key("verifying.key");
+        BOOST_REQUIRE(js->is_equal(*js2.get()));
+    }
+} FC_LOG_AND_RETHROW() }
+
+
+struct keys_fixture
+{
+    keys_fixture()\
+    {
+        std::ifstream fpk("proving.key", std::ios::binary);
+        if(!fpk.is_open())
+            throw std::runtime_error("could not load proving key file");
+        fpk >> pk;
+        std::ifstream fvk("verifying.key", std::ios::binary);
+        if(!fvk.is_open())
+            throw std::runtime_error("could not load proving key file");
+        fvk >> vk;
+    }
+    ~keys_fixture()
+    {
+    }
+
+    libsnark::r1cs_ppzksnark_proving_key<ppzksnark_ppT> pk;
+    libsnark::r1cs_ppzksnark_verification_key<ppzksnark_ppT> vk;
+};
+
+BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
 { try {
         libsnark::init_alt_bn128_params();
+        libsnark::default_r1cs_ppzksnark_pp::init_public_params();
         stealth_spending_key recipient_key = stealth_spending_key::random();
         stealth_payment_address recipient_addr = recipient_key.address();
         fc::uint256 phi = random_uint256();
@@ -228,26 +272,94 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
         }
         uint64_t vpub_old = 10;
         uint64_t vpub_new = 0;
+
+
+        {
+            libsnark::protoboard<FieldT> pb;
+            size_t num_constraints = 999;
+            size_t num_inputs = 100;
+            libsnark::pb_variable_array<FieldT> A;
+            libsnark::pb_variable_array<FieldT> B;
+            libsnark::pb_variable<FieldT> res;
+
+            res.allocate(pb, "res");
+            A.allocate(pb, num_constraints, "A");
+            B.allocate(pb, num_constraints, "B");
+
+            libsnark::inner_product_gadget<FieldT> compute_inner_product(pb, A, B,
+                                                    res, "compute_inner_product");
+            compute_inner_product.generate_r1cs_constraints();
+
+            for(size_t i = 0; i < num_constraints; ++i)
+            {
+                pb.val(A[i]) = FieldT::random_element();
+                pb.val(B[i]) = FieldT::random_element();
+            }
+
+            compute_inner_product.generate_r1cs_witness();
+
+            pb.set_input_sizes(num_inputs);
+
+            BOOST_REQUIRE(pb.is_satisfied());
+
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
+        }
+
         {
             libsnark::protoboard<FieldT> pb;
             libsnark::pb_variable<FieldT> ZERO;
             ZERO.allocate(pb);
-            {
-                libsnark::digest_variable<FieldT> a_sk(pb,  256, "");
-                std::shared_ptr<libsnark::digest_variable<FieldT>> a_pk(
-                            new libsnark::digest_variable<FieldT>(pb,  256, "")
-                                );
-                PRF_addr_a_pk_gadget<FieldT> g(pb, ZERO, a_sk.bits, a_pk);
-                a_sk.generate_r1cs_constraints();
-                g.generate_r1cs_constraints();
-                a_sk.bits.fill_with_bits(
-                    pb,
-                    convert_uint256_to_bool_vector(recipient_key.value.get_secret())
-                );
-                g.generate_r1cs_witness();
-            }
+            libsnark::digest_variable<FieldT> a_sk(pb,  256, "");
+            std::shared_ptr<libsnark::digest_variable<FieldT>> a_pk(
+                        new libsnark::digest_variable<FieldT>(pb,  256, "")
+                            );
+            PRF_addr_a_pk_gadget<FieldT> g(pb, ZERO, a_sk.bits, a_pk);
+            a_sk.generate_r1cs_constraints();
+            g.generate_r1cs_constraints();
+            a_sk.bits.fill_with_bits(
+                pb,
+                convert_uint256_to_bool_vector(recipient_key.value.get_secret())
+            );
+            g.generate_r1cs_witness();
             BOOST_REQUIRE(pb.is_satisfied());
+
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
+
         {
             libsnark::protoboard<FieldT> pb;
             libsnark::pb_variable<FieldT> ZERO;
@@ -472,28 +584,6 @@ BOOST_AUTO_TEST_CASE(stealth_gadgets_test)
         }
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( stealth_joinsplit_generation )
-{ try {\
-    if(!boost::filesystem::exists("proving.key") ||
-       !boost::filesystem::exists("verifying.key"))
-    {
-        libsnark::init_alt_bn128_params();
-        std::cout << "Generate joinsplit..." << std::endl;
-        std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
-        std::cout << "Save generated keys..." << std::endl;
-        js->save_proving_key("proving.key");
-        js->save_verifying_key("verifying.key");
-
-        std::cout << "Create joinsplit..." << std::endl;
-        std::unique_ptr<stealth_joinsplit> js2 = stealth_joinsplit::unopened();
-        std::cout << "Load generated keys..." << std::endl;
-        js2->load_proving_key("proving.key");
-        js2->load_verifying_key("verifying.key");
-        BOOST_REQUIRE(js->is_equal(*js2.get()));
-    }
-} FC_LOG_AND_RETHROW() }
-
-
 
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {\
@@ -523,10 +613,10 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
     stealth_proof proof;
 
     std::cout << "Generate joinsplit..." << std::endl;
-    std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::unopened();
-    std::cout << "Load generated keys..." << std::endl;
+    std::unique_ptr<stealth_joinsplit> js = stealth_joinsplit::generate();
+ /*   std::cout << "Load generated keys..." << std::endl;
     js->load_proving_key("proving.key");
-    js->load_verifying_key("verifying.key");
+    js->load_verifying_key("verifying.key");*/
 
     {
         boost::array<stealth_input, 2> inputs = {
@@ -559,22 +649,20 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
             rt
         );
 
+        // Verify the transaction:
+        std::cout << "Verify the transaction..." << std::endl;
+        BOOST_REQUIRE(js->verify(
+            proof,
+            pubKeyHash,
+            randomSeed,
+            macs,
+            nullifiers,
+            commitments,
+            vpub_old,
+            vpub_new,
+            rt
+        ));
     }
-
-    // Verify the transaction:
-    std::cout << "Verify the transaction..." << std::endl;
-    BOOST_REQUIRE(js->verify(
-        proof,
-        pubKeyHash,
-        randomSeed,
-        macs,
-        nullifiers,
-        commitments,
-        vpub_old,
-        vpub_new,
-        rt
-    ));
-
     // Recipient should decrypt
     // Now the recipient should spend the money again
     std::cout << "Get hsig..." << std::endl;
