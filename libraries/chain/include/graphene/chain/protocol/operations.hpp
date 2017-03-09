@@ -30,6 +30,7 @@
 #include <graphene/chain/protocol/custom.hpp>
 #include <graphene/chain/protocol/committee_member.hpp>
 #include <graphene/chain/protocol/confidential.hpp>
+#include <graphene/chain/protocol/stealth.hpp>
 #include <graphene/chain/protocol/fba.hpp>
 #include <graphene/chain/protocol/market.hpp>
 #include <graphene/chain/protocol/proposal.hpp>
@@ -93,7 +94,10 @@ namespace graphene { namespace chain {
             asset_settle_cancel_operation,  // VIRTUAL
             asset_claim_fees_operation,
             fba_distribute_operation,        // VIRTUAL
-            split_join_operation
+            split_join_operation, // TODO: remove
+            transfer_to_stealth_operation,
+            stealth_transfer_operation,
+            transfer_from_stealth_operation
          > operation;
 
    /// @} // operations group

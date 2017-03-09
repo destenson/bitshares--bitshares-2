@@ -59,6 +59,7 @@ add_library( graphene_chain
              protocol/vote.cpp
              protocol/stealth_zk.cpp
              protocol/stealth_snark.cpp
+             protocol/stealth.cpp
 
              genesis_state.cpp
              get_config.cpp
@@ -79,6 +80,7 @@ add_library( graphene_chain
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
              confidential_evaluator.cpp
+             stealth_evaluator.cpp
              special_authority.cpp
              buyback.cpp
 

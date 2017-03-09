@@ -1047,6 +1047,8 @@ public:
     }
 };
 
+void initialize_curve_params();
+
 struct stealth_joinsplit
 {
     static std::unique_ptr<stealth_joinsplit> generate();

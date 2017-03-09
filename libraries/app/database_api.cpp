@@ -138,6 +138,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
+      // Stealth balances
+      vector<stealth_balance_object> get_stealth_balances( const flat_set<commitment_type>& commitments )const;
 
    //private:
       template<typename T>

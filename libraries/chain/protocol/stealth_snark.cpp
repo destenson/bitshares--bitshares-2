@@ -195,24 +195,23 @@ curve_G2 CompressedG2::to_libsnark_g2() const
 }
 
 
+std::once_flag init_public_params_once_flag;
+
+void initialize_curve_params()
+{
+    std::call_once (init_public_params_once_flag, curve_pp::init_public_params);
+}
+
 template<>
 stealth_proof::stealth_proof(const libsnark::r1cs_ppzksnark_proof<curve_pp> &proof)
 {
-    std::cout << "g_A..." << std::endl;
     g_A = CompressedG1(proof.g_A.g);
-    std::cout << "g_A_prime..." << std::endl;
     g_A_prime = CompressedG1(proof.g_A.h);
-    std::cout << "g_B..." << std::endl;
     g_B = CompressedG2(proof.g_B.g);
-    std::cout << "g_B_prime..." << std::endl;
     g_B_prime = CompressedG1(proof.g_B.h);
-    std::cout << "g_C..." << std::endl;
     g_C = CompressedG1(proof.g_C.g);
-    std::cout << "g_C_prime..." << std::endl;
     g_C_prime = CompressedG1(proof.g_C.h);
-    std::cout << "g_K..." << std::endl;
     g_K = CompressedG1(proof.g_K);
-    std::cout << "g_H..." << std::endl;
     g_H = CompressedG1(proof.g_H);
 }
 

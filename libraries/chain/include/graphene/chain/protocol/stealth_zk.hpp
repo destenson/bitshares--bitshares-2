@@ -292,17 +292,12 @@ struct stealth_output
                       const fc::uint256& h_sig) const;
 };
 
-
-struct stealth_transfer_operation : public base_operation
+struct stealth_description
 {
-   asset fee;
-
-   /** graphene TEMP account */
-   account_id_type fee_payer()const;
-   void            validate()const;
-   share_type      calculate_fee()const;
 
 };
+
+
 
 }}
 

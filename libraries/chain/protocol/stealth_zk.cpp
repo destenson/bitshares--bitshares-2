@@ -751,7 +751,7 @@ struct joinsplit_impl : public stealth_joinsplit
     static void initialize() {
         //TODO: LOCK(cs_InitializeParams);
 
-        ppzksnark_ppT::init_public_params();
+        initialize_curve_params();
     }
 
     virtual void load_proving_key(std::string path) override

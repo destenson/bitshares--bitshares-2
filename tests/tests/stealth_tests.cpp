@@ -241,8 +241,7 @@ struct keys_fixture
 
 BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
 { try {
-        libsnark::init_alt_bn128_params();
-        libsnark::default_r1cs_ppzksnark_pp::init_public_params();
+        initialize_curve_params();
         stealth_spending_key recipient_key = stealth_spending_key::random();
         stealth_payment_address recipient_addr = recipient_key.address();
         fc::uint256 phi = random_uint256();
@@ -385,6 +384,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness();
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -411,6 +428,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness();
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -437,6 +472,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness();
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -470,6 +523,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness();
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -479,6 +550,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness(notes[0]);
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -515,6 +604,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness(merkle_path);
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -536,6 +643,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness(merkle_path, recipient_key, notes[0]);
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -564,6 +689,24 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 g.generate_r1cs_witness(notes[0]);
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
         {
             libsnark::protoboard<FieldT> pb;
@@ -581,12 +724,30 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                 );
             }
             BOOST_REQUIRE(pb.is_satisfied());
+            //generator
+            std::cout << "generate keypair..." << std::endl;
+            auto keypair = libsnark::r1cs_ppzksnark_generator<ppzksnark_ppT>(pb.constraint_system);
+            std::cout << "after generate keypair..." << std::endl;
+
+            std::vector<FieldT> primary_input = pb.primary_input();
+            std::vector<FieldT> aux_input = pb.auxiliary_input();
+            pb.constraint_system.swap_AB_if_beneficial();
+            auto r1cs_proof = libsnark::r1cs_ppzksnark_prover<ppzksnark_ppT>(
+                        keypair.pk,
+                        primary_input,
+                        aux_input,
+                        pb.constraint_system
+                    );
+            BOOST_REQUIRE(
+                        libsnark::r1cs_ppzksnark_verifier_strong_IC<ppzksnark_ppT>(
+                            keypair.vk, primary_input, r1cs_proof)
+                        );
         }
 } FC_LOG_AND_RETHROW() }
 
-
+/*
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
-{ try {\
+{ try {
 
     libsnark::init_alt_bn128_params();
     // The recipient's information.
@@ -743,5 +904,5 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         rt
     ));
 } FC_LOG_AND_RETHROW() }
-
+*/
 
