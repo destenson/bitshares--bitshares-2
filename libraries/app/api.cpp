@@ -36,6 +36,7 @@
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/stealth_object.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>

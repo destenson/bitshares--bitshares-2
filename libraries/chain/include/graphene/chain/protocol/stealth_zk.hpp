@@ -292,11 +292,6 @@ struct stealth_output
                       const fc::uint256& h_sig) const;
 };
 
-struct stealth_description
-{
-
-};
-
 
 
 }}

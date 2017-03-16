@@ -1095,4 +1095,86 @@ struct stealth_joinsplit
     virtual bool is_equal(const stealth_joinsplit& other) = 0;
 };
 
+struct stealth_description
+{
+    // These values 'enter from' and 'exit to' the value
+    // pool, respectively.
+    asset in;
+    asset out;
+
+    // JoinSplits are always anchored to a root in the note
+    // commitment tree at some point in the blockchain
+    // history or in the history of the current
+    // transaction.
+    fc::uint256 anchor;
+
+    // Nullifiers are used to prevent double-spends. They
+    // are derived from the secrets placed in the note
+    // and the secret spend-authority key known by the
+    // spender.
+    boost::array<fc::uint256, 2> nullifiers;
+
+    // Note commitments are introduced into the commitment
+    // tree, blinding the public about the values and
+    // destinations involved in the JoinSplit. The presence of
+    // a commitment in the note commitment tree is required
+    // to spend it.
+    boost::array<fc::uint256, 2> commitments;
+
+    // Ephemeral key
+    fc::ecc::public_key ephemeral_key;
+
+    // Ciphertexts
+    // These contain trapdoors, values and other information
+    // that the recipient needs, including a memo field. It
+    // is encrypted using the scheme implemented in stealth_encryption
+    boost::array<binary, 2> ciphertexts;
+
+    // Random seed
+    fc::uint256 random_seed;
+
+    // MACs
+    // The verification of the JoinSplit requires these MACs
+    // to be provided as an input.
+    boost::array<fc::uint256, 2> macs;
+
+    // JoinSplit proof
+    // This is a zk-SNARK which ensures that this JoinSplit is valid.
+    stealth_proof proof;
+
+    stealth_description(): in(0), out(0) { }
+
+    stealth_description(
+            stealth_joinsplit& params,
+            const fc::uint256& pub_key_hash,
+            const fc::uint256& rt,
+            const boost::array<stealth_input, 2>& inputs,
+            const boost::array<stealth_output, 2>& outputs,
+            asset in,
+            asset out,
+            bool compute_proof = true // Set to false in some tests
+    );
+
+
+    // Verifies that the JoinSplit proof is correct.
+    bool verify(
+        stealth_joinsplit& params,
+        //stealth_verifier& verifier,
+        const fc::uint256& pubKeyHash
+    ) const;
+
+    // Returns the calculated h_sig
+    fc::uint256 h_sig(stealth_joinsplit& params, const fc::uint256& pub_key_hash) const;
+
+    // for using in multiindex
+    bool operator == (const stealth_description&)const { return true; };
+    bool operator != (const stealth_description&)const { return true; };
+    bool operator > (const stealth_description&)const { return true; };
+    bool operator < (const stealth_description&)const { return true; };
+    bool operator >= (const stealth_description&)const { return true; };
+    bool operator <= (const stealth_description&)const { return true; };
+};
+
 }}
+
+FC_REFLECT( graphene::chain::stealth_description, (in)(out));

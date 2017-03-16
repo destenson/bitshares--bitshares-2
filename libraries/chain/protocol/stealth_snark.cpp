@@ -5,6 +5,7 @@
 
 #include <common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <mutex>
 
 
 namespace graphene { namespace chain {
@@ -311,6 +312,60 @@ bool operator ==(const Fq &p1, const Fq &p2)
 bool operator !=(const Fq &p1, const Fq &p2)
 {
     return !(p1 == p2);
+}
+
+stealth_description::stealth_description(stealth_joinsplit &params,
+                                         const fc::uint256 &pub_key_hash,
+                                         const fc::uint256 &rt,
+                                         const boost::array<stealth_input, 2> &inputs,
+                                         const boost::array<stealth_output, 2> &outputs,
+                                         asset in, asset out, bool compute_proof):
+    in(in), out(out), anchor(rt)
+{
+    boost::array<stealth_note, 2> notes;
+
+    if (compute_proof) {
+ //       params.loadProvingKey();
+    }
+    proof = params.prove(
+        inputs,
+        outputs,
+        notes,
+        ciphertexts,
+        ephemeral_key,
+        pub_key_hash,
+        random_seed,
+        macs,
+        nullifiers,
+        commitments,
+        in.amount.value,
+        out.amount.value,
+        anchor,
+        compute_proof
+    );
+}
+
+
+bool stealth_description::verify(stealth_joinsplit &params,
+                                 const fc::uint256 &pubKeyHash) const
+{
+    return params.verify(
+        proof,
+        pubKeyHash,
+        random_seed,
+        macs,
+        nullifiers,
+        commitments,
+        in.amount.value,
+        out.amount.value,
+        anchor
+    );
+}
+
+fc::uint256 stealth_description::h_sig(stealth_joinsplit &params,
+                                       const fc::uint256 &pub_key_hash) const
+{
+    return params.h_sig(random_seed, nullifiers, pub_key_hash);
 }
 
 }}

@@ -72,14 +72,12 @@ account_id_type stealth_transfer_operation::fee_payer()const
  */
 void stealth_transfer_operation::validate()const
 { try {
-   FC_ASSERT( in.size(), "there must be at least one input" );
-   FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );
 
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 share_type stealth_transfer_operation::calculate_fee( const fee_parameters_type& k )const
 {
-    return k.fee + outputs.size() * k.price_per_output;
+    return k.fee;
 }
 
 

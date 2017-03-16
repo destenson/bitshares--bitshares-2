@@ -24,7 +24,7 @@
 
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
-#include <graphene/chain/protocol/stealth_zk.hpp>
+#include <graphene/chain/protocol/stealth_snark.hpp>
 
 namespace graphene { namespace chain {
 

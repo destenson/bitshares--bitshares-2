@@ -239,6 +239,7 @@ struct keys_fixture
     libsnark::r1cs_ppzksnark_verification_key<ppzksnark_ppT> vk;
 };
 
+/*
 BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
 { try {
         initialize_curve_params();
@@ -744,8 +745,8 @@ BOOST_FIXTURE_TEST_CASE(stealth_gadgets_test, keys_fixture)
                         );
         }
 } FC_LOG_AND_RETHROW() }
+*/
 
-/*
 BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
 { try {
 
@@ -904,5 +905,5 @@ BOOST_AUTO_TEST_CASE( stealth_joinsplit_test )
         rt
     ));
 } FC_LOG_AND_RETHROW() }
-*/
+
 

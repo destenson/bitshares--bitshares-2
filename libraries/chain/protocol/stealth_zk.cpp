@@ -248,7 +248,15 @@ stealth_note::stealth_note(const fc::uint256 &p_k,
 
 fc::uint256 stealth_note::commitment() const
 {
-    return fc::sha256::hash(fc::raw::pack( *this ));
+    fc::sha256::encoder e;
+    fc::raw::pack(e, paying_key);
+    fc::raw::pack(e, amount.amount.value);
+    fc::raw::pack(e, amount.asset_id);
+    fc::raw::pack(e, nullifier_base);
+    fc::raw::pack(e, trapdoor);
+    return e.result();
+    // not obviuos amount member serialization,  difficult to build gadget
+    //return fc::sha256::hash(fc::raw::pack( *this ));
 }
 
 fc::uint256 stealth_note::nullifier(const stealth_spending_key &a_sk) const
