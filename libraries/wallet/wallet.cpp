@@ -3468,19 +3468,20 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
    FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
 
 
-   asset total_amount = asset_obj->amount(amount);
+   asset total_amount = asset_obj->amount_from_string(amount);
 
    // Create joinsplits, where each output represents a zaddr recipient.
    // Funds are removed from the value pool and enter the private pool
-   uint64_t vpub_old = total_amount.amount.value;
-   uint64_t vpub_new = 0;
+   asset vpub_old = total_amount;
+   asset vpub_new = asset_obj->amount(0);
    stealth_payment_address pa = stealth_payment_address(stealth_address);
 
-   std::vector<boost::optional<stealth_incremental_witness>> witnesses;
+   std::vector< boost::optional<incremental_witness> > witnesses;
    fc::uint256 anchor; // TODO: get best anchor
 
    boost::array<stealth_input, 2> inputs ({stealth_input(), stealth_input()});
-   boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount), stealth_outpu()});
+   boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount),
+                                            stealth_output()});
 
    fc::ecc::private_key sk = fc::ecc::private_key::generate();
    fc::ecc::public_key pk = sk.get_public_key();
@@ -3488,8 +3489,8 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
    fc::raw::pack(e, pk);
    fc::uint256 pk_hash = e.result();
 
-   stealth_joinsplit* params;
-   stealth_description sd(params, pk_hash, anchor, inputs, outputs, vpub_old,  vpub_new);
+   std::unique_ptr<stealth_joinsplit> params = stealth_joinsplit::unopened();
+   stealth_description sd(*params, pk_hash, anchor, inputs, outputs, vpub_old,  vpub_new);
 
    transfer_to_stealth_operation sop;
    sop.from   = from_account.id;
@@ -3497,24 +3498,63 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
    sop.outputs.push_back(sd);
 
    signed_transaction trx;
-   trx.operations.push_back( bop );
+   trx.operations.push_back( sop );
    my->set_operation_fees( trx, my->_remote_db->get_global_properties().parameters.current_fees);
    trx.validate();
-   trx = sign_transaction(trx, broadcast);
+   trx = sign_transaction(trx, true);
 
-   return true;
-
-} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
+} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(amount)(stealth_address) ) }
 
 
 void wallet_api::transfer_from_stealth(string from_stealth_address,
                                        string to_account_id_or_name,
                                        string amount, string asset_symbol)
-{
-    vector<char> d = fc::from_base58(from_stealth_address);
-    string name(d.begin(), d.end());
-    transfer(name, to_account_id_or_name, amount, asset_symbol, "test_stealth", true);
-}
+{ try {
+   FC_ASSERT( !is_locked() );
+
+   account_object to_account = my->get_account(to_account_id_or_name);
+
+   fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+   FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+
+   asset total_amount = asset_obj->amount_from_string(amount);
+
+   // Create joinsplits, where each output represents a zaddr recipient.
+   // Funds are removed from the value pool and enter the private pool
+   asset vpub_old = asset_obj->amount(0);
+   asset vpub_new = total_amount;
+   stealth_payment_address pa = stealth_payment_address(from_stealth_address);
+
+   std::vector<boost::optional<incremental_witness>> witnesses;
+   fc::uint256 anchor; // TODO: get best anchor
+
+   boost::array<stealth_input, 2> inputs ({stealth_input(), stealth_input()});
+   boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount),
+                                            stealth_output()});
+
+   fc::ecc::private_key sk = fc::ecc::private_key::generate();
+   fc::ecc::public_key pk = sk.get_public_key();
+   fc::sha256::encoder e;
+   fc::raw::pack(e, pk);
+   fc::uint256 pk_hash = e.result();
+
+   std::unique_ptr<stealth_joinsplit> params = stealth_joinsplit::unopened();
+   stealth_description sd(*params, pk_hash, anchor, inputs, outputs, vpub_old,  vpub_new);
+
+   transfer_from_stealth_operation sop;
+   sop.to   = to_account.id;
+   sop.amount = total_amount;
+   sop.inputs.push_back(sd);
+
+   signed_transaction trx;
+   trx.operations.push_back( sop );
+   my->set_operation_fees( trx, my->_remote_db->get_global_properties().parameters.current_fees);
+   trx.validate();
+   trx = sign_transaction(trx, true);
+
+} FC_CAPTURE_AND_RETHROW( (from_stealth_address)(amount)(to_account_id_or_name) ) }
+
 
 void wallet_api::stealth_transfer(string from_stealth_address,
                                   string to_stealth_address, string amount,
