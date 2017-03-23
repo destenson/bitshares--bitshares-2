@@ -1159,7 +1159,6 @@ struct stealth_description
     // Verifies that the JoinSplit proof is correct.
     bool verify(
         stealth_joinsplit& params,
-        //stealth_verifier& verifier,
         const fc::uint256& pubKeyHash
     ) const;
 

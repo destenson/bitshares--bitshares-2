@@ -27,6 +27,7 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/dh.hpp>
 #include <fc/crypto/aes.hpp>
+#include <fc/crypto/base58.hpp>
 #include <fc/thread/spin_lock.hpp>
 #include <fc/thread/scoped_lock.hpp>
 
@@ -199,6 +200,22 @@ fc::uint256 stealth_payment_address::hash() const
     return fc::sha256::hash(fc::raw::pack( *this ));
 }
 
+stealth_payment_address::stealth_payment_address(const std::string &address)
+{
+    if(address.size() < 2)
+        throw std::runtime_error("Invalid stealth payment address encoding");
+    if(address.substr(0, 2) != "st")
+        throw std::runtime_error("Invalid stealth payment address encoding");
+    std::vector<char> data = fc::from_base58(address.substr(2));
+    *this = fc::raw::unpack<stealth_payment_address>(data);
+}
+
+std::string stealth_payment_address::to_string() const
+{
+    std::vector<char> data = fc::raw::pack(*this);
+    return "st" + fc::to_base58(data);
+}
+
 fc::ecc::public_key stealth_viewing_key::transmission_key() const
 {
     return stealth_note_encryption::generate_public_key(value);
@@ -219,7 +236,7 @@ stealth_viewing_key stealth_spending_key::viewing_key() const
 stealth_payment_address stealth_spending_key::address() const
 {
     return stealth_payment_address(
-        {PRF_addr_a_pk(value), viewing_key().transmission_key()});
+        PRF_addr_a_pk(value), viewing_key().transmission_key());
 }
 
 

@@ -50,6 +50,12 @@ struct stealth_payment_address
     fc::ecc::public_key transmission_key;
 
     fc::uint256 hash() const;
+
+    stealth_payment_address() {}
+    stealth_payment_address(const std::string& address);
+    stealth_payment_address(fc::uint256 pk, fc::ecc::public_key tk) :
+        paying_key(pk), transmission_key(tk) {}
+    std::string to_string() const;
 };
 
 struct stealth_viewing_key

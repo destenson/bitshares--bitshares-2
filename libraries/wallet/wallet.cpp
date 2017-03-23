@@ -3459,11 +3459,53 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
                                      string amount,
                                      string asset_symbol,
                                      string stealth_address)
-{
-    vector<char> d = fc::from_base58(stealth_address);
-    string name(d.begin(), d.end());
-    transfer(from_account_id_or_name, name, amount, asset_symbol, "test_stealth", true);
-}
+{ try {
+   FC_ASSERT( !is_locked() );
+
+   account_object from_account = my->get_account(from_account_id_or_name);
+
+   fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+   FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+
+   asset total_amount = asset_obj->amount(amount);
+
+   // Create joinsplits, where each output represents a zaddr recipient.
+   // Funds are removed from the value pool and enter the private pool
+   uint64_t vpub_old = total_amount.amount.value;
+   uint64_t vpub_new = 0;
+   stealth_payment_address pa = stealth_payment_address(stealth_address);
+
+   std::vector<boost::optional<stealth_incremental_witness>> witnesses;
+   fc::uint256 anchor; // TODO: get best anchor
+
+   boost::array<stealth_input, 2> inputs ({stealth_input(), stealth_input()});
+   boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount), stealth_outpu()});
+
+   fc::ecc::private_key sk = fc::ecc::private_key::generate();
+   fc::ecc::public_key pk = sk.get_public_key();
+   fc::sha256::encoder e;
+   fc::raw::pack(e, pk);
+   fc::uint256 pk_hash = e.result();
+
+   stealth_joinsplit* params;
+   stealth_description sd(params, pk_hash, anchor, inputs, outputs, vpub_old,  vpub_new);
+
+   transfer_to_stealth_operation sop;
+   sop.from   = from_account.id;
+   sop.amount = total_amount;
+   sop.outputs.push_back(sd);
+
+   signed_transaction trx;
+   trx.operations.push_back( bop );
+   my->set_operation_fees( trx, my->_remote_db->get_global_properties().parameters.current_fees);
+   trx.validate();
+   trx = sign_transaction(trx, broadcast);
+
+   return true;
+
+} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
+
 
 void wallet_api::transfer_from_stealth(string from_stealth_address,
                                        string to_account_id_or_name,
