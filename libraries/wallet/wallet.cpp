@@ -3476,12 +3476,14 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
    asset vpub_new = asset_obj->amount(0);
    stealth_payment_address pa = stealth_payment_address(stealth_address);
 
-   std::vector< boost::optional<incremental_witness> > witnesses;
-   fc::uint256 anchor; // TODO: get best anchor
 
    boost::array<stealth_input, 2> inputs ({stealth_input(), stealth_input()});
    boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount),
                                             stealth_output()});
+
+   std::vector< boost::optional<incremental_witness> > witnesses;
+   fc::uint256 anchor;
+ //  get_best_nullifier_anchor(outputs, witnesses, anchor);
 
    fc::ecc::private_key sk = fc::ecc::private_key::generate();
    fc::ecc::public_key pk = sk.get_public_key();
@@ -3505,6 +3507,14 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
 
 } FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(amount)(stealth_address) ) }
 
+/*
+void wallet_api::get_best_nullifier_anchor(const boost::array<stealth_output, 2>& outputs,
+                                           std::vector< boost::optional<incremental_witness> >& witnesses,
+                                           fc::uint256& anchor)
+{
+
+}
+*/
 
 void wallet_api::transfer_from_stealth(string from_stealth_address,
                                        string to_account_id_or_name,
