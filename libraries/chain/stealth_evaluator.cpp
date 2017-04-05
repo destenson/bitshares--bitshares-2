@@ -85,10 +85,6 @@ void_result transfer_from_stealth_evaluator::do_evaluate( const transfer_from_st
    const auto& cidx = sbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )
    {
- /*     auto itr = cidx.find( in.commitment );
-      FC_ASSERT( itr != cidx.end() );
-      FC_ASSERT( itr->asset_id == o.fee.asset_id );
-      FC_ASSERT( itr->owner == in.owner );*/
    }
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -101,9 +97,12 @@ void_result transfer_from_stealth_evaluator::do_apply( const transfer_from_steal
    const auto& cidx = sbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )
    {
- /*     auto itr = cidx.find( in.commitment );
-      FC_ASSERT( itr != cidx.end() );
-      db().remove( *itr );*/
+       db().create<stealth_nullifier_object>( [&]( stealth_nullifier_object& obj ){
+           obj.nullifier   = in.nullifiers[0];
+       });
+       db().create<stealth_nullifier_object>( [&]( stealth_nullifier_object& obj ){
+           obj.nullifier   = in.nullifiers[1];
+       });
    }
    const auto& add = o.amount.asset_id(db()).dynamic_asset_data_id(db());  // verify fee is a legit asset
    db().modify( add, [&]( asset_dynamic_data_object& obj ){
@@ -127,18 +126,6 @@ void_result stealth_transfer_evaluator::do_evaluate( const stealth_transfer_oper
    o.fee.asset_id(db());  // verify fee is a legit asset
    const auto& sbi = db().get_index_type<stealth_balance_index>();
    const auto& cidx = sbi.indices().get<by_commitment>();
- /*  for( const auto& out : o.outputs )
-   {
-      for( const auto& a : out.owner.account_auths )
-         a.first(d); // verify all accounts exist and are valid
-   }
-   for( const auto& in : o.inputs )
-   {
-      auto itr = cidx.find( in.commitment );
-      GRAPHENE_ASSERT( itr != cidx.end(), stealth_transfer_unknown_commitment, "", ("commitment",in.commitment) );
-      FC_ASSERT( itr->asset_id == o.fee.asset_id );
-      FC_ASSERT( itr->owner == in.owner );
-   }*/
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
@@ -147,20 +134,15 @@ void_result stealth_transfer_evaluator::do_apply( const stealth_transfer_operati
    db().adjust_balance( o.fee_payer(), o.fee ); // deposit the fee to the temp account
    const auto& sbi = db().get_index_type<stealth_balance_index>();
    const auto& cidx = sbi.indices().get<by_commitment>();
-/*   for( const auto& in : o.inputs )
+   for( const auto& in : o.transfers )
    {
-      auto itr = cidx.find( in.commitment );
-      GRAPHENE_ASSERT( itr != cidx.end(), stealth_transfer_unknown_commitment, "", ("commitment",in.commitment) );
-      db().remove( *itr );
+       db().create<stealth_nullifier_object>( [&]( stealth_nullifier_object& obj ){
+           obj.nullifier   = in.nullifiers[0];
+       });
+       db().create<stealth_nullifier_object>( [&]( stealth_nullifier_object& obj ){
+           obj.nullifier   = in.nullifiers[1];
+       });
    }
-   for( const auto& out : o.outputs )
-   {
-      db().create<stealth_balance_object>( [&]( stealth_balance_object& obj ){
-          obj.asset_id   = o.fee.asset_id;
-          obj.owner      = out.owner;
-          obj.commitment = out.commitment;
-      });
-   }*/
    const auto& add = o.fee.asset_id(db()).dynamic_asset_data_id(db());
    db().modify( add, [&]( asset_dynamic_data_object& obj ){
       obj.stealth_supply -= o.fee.amount;
