@@ -354,6 +354,10 @@ namespace graphene { namespace app {
                  for( const auto& a : aobj->owner.account_auths )
                     result.push_back( a.first );
                  break;
+              } case impl_stealth_nullifier_object_type:{
+                 const auto& aobj = dynamic_cast<const stealth_nullifier_object*>(obj);
+                 assert( aobj != nullptr );
+                 break;
               } case impl_block_summary_object_type:
                   break;
                  case impl_account_transaction_history_object_type:

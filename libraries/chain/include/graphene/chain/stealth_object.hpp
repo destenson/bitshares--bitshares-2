@@ -66,6 +66,37 @@ typedef multi_index_container<
 > stealth_balance_object_multi_index_type;
 typedef generic_index<stealth_balance_object, stealth_balance_object_multi_index_type> stealth_balance_index;
 
+/**
+ * @class stealth_nullifier_object
+ * @brief tracks a stealth nullifiers
+ * @ingroup object
+ * @ingroup protocol
+ */
+class stealth_nullifier_object : public graphene::db::abstract_object<stealth_nullifier_object>
+{
+   public:
+      static const uint8_t space_id = implementation_ids;
+      static const uint8_t type_id  = impl_stealth_nullifier_object_type;
+
+      fc::uint256 nullifier;
+};
+
+struct by_id;
+struct by_nullifier;
+
+/**
+ * @ingroup object_index
+ */
+typedef multi_index_container<
+   stealth_nullifier_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_nullifier>, member<stealth_nullifier_object, fc::uint256, &stealth_nullifier_object::nullifier> >
+   >
+> stealth_nullifier_object_multi_index_type;
+typedef generic_index<stealth_nullifier_object, stealth_nullifier_object_multi_index_type> stealth_nullifier_index;
+
 } } // graphene::chain
 
 FC_REFLECT_DERIVED( graphene::chain::stealth_balance_object, (graphene::db::object), (description)(asset_id)(owner) )
+FC_REFLECT_DERIVED( graphene::chain::stealth_nullifier_object, (graphene::db::object), (nullifier) )

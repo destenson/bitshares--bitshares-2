@@ -157,7 +157,8 @@ namespace graphene { namespace chain {
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
       impl_sj_note_object_type,
-      impl_stealth_balance_object_type
+      impl_stealth_balance_object_type,\
+      impl_stealth_nullifier_object_type
    };
 
    //typedef fc::unsigned_int            object_id_type;
@@ -178,6 +179,7 @@ namespace graphene { namespace chain {
    class balance_object;
    class blinded_balance_object;
    class stealth_balance_object;
+   class stealth_nullifier_object;
    class sj_note_object;
 
    typedef object_id< protocol_ids, account_object_type,            account_object>               account_id_type;
@@ -230,6 +232,7 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids, impl_budget_record_object_type, budget_record_object >                        budget_record_id_type;
    typedef object_id< implementation_ids, impl_blinded_balance_object_type, blinded_balance_object >                    blinded_balance_id_type;
    typedef object_id< implementation_ids, impl_stealth_balance_object_type, stealth_balance_object >                    stealth_balance_id_type;
+   typedef object_id< implementation_ids, impl_stealth_nullifier_object_type, stealth_nullifier_object >                stealth_nullifier_id_type;
    typedef object_id< implementation_ids, impl_special_authority_object_type, special_authority_object >                special_authority_id_type;
    typedef object_id< implementation_ids, impl_buyback_object_type, buyback_object >                                    buyback_id_type;
    typedef object_id< implementation_ids, impl_fba_accumulator_object_type, fba_accumulator_object >                    fba_accumulator_id_type;
@@ -360,6 +363,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_account_transaction_history_object_type)
                  (impl_blinded_balance_object_type)
                  (impl_stealth_balance_object_type)
+                 (impl_stealth_nullifier_object_type)
                  (impl_chain_property_object_type)
                  (impl_witness_schedule_object_type)
                  (impl_budget_record_object_type)
