@@ -555,6 +555,11 @@ class database_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      //////////////////////
+      // Stealth info     //
+      //////////////////////
+
+      fc::uint256 get_nullifier_anchor() const;
    private:
       std::shared_ptr< database_api_impl > my;
 };

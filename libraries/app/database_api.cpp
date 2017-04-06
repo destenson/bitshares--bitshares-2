@@ -141,6 +141,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Stealth balances
       vector<stealth_balance_object> get_stealth_balances( const flat_set<commitment_type>& commitments )const;
       vector<stealth_nullifier_object> get_stealth_nullifiers()const;
+      fc::uint256 get_nullifier_anchor() const;
 
    //private:
       template<typename T>
@@ -1751,6 +1752,22 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
    }
    return result;
 }
+
+/////////////////////////////////////////////////////////////////////
+//                                                                 //
+// Stealth info                                                    //
+//                                                                 //
+/////////////////////////////////////////////////////////////////////
+fc::uint256 database_api::get_nullifier_anchor() const
+{
+    return my->get_nullifier_anchor();
+}
+
+fc::uint256 database_api_impl::get_nullifier_anchor() const
+{
+    return fc::uint256();
+}
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //

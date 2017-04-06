@@ -3419,23 +3419,18 @@ signed_transaction wallet_api::approve_proposal(
 string wallet_api::create_stealth_address()
 {
     load_wallet_file();
-    size_t s = my->_wallet.stealth_accs.size() + (size_t)time(0);
-    string name = "st" + fc::to_base58((const char*)&s, sizeof(size_t));
-    transform(name.begin(), name.end(), name.begin(), ::tolower);
-    string existing_name = list_my_accounts()[0].name;
-    create_account_with_brain_key(name, name, existing_name, existing_name, true);
-    my->_wallet.stealth_accs.push_back(name);
+    stealth_spending_key key = stealth_spending_key::random();
+    stealth_payment_address res = key.address();
+    my->_wallet.stealth_accs.push_back(key);
     save_wallet_file();
-    return fc::to_base58(name.data(), name.size());
+    return res.to_string();
 }
 
 vector<asset> wallet_api::get_stealth_balances()
 {
     vector<asset> res;
-    for(string& n: my->_wallet.stealth_accs)
+    for(auto& n: my->_wallet.stealth_accs)
     {
-        vector<asset> data = list_account_balances(n);
-        res.insert(res.end(), data.begin(), data.end());
     }
     return res;
 }
@@ -3443,16 +3438,28 @@ vector<asset> wallet_api::get_stealth_balances()
 vector<string> wallet_api::get_stealth_addresses() const
 {
     vector<string> res;
-    for(const string& n: my->_wallet.stealth_accs)
-        res.push_back(fc::to_base58(n.data(), n.size()));
+    for(const auto& key: my->_wallet.stealth_accs)
+        res.push_back(key.address().to_string());
     return res;
 }
 
 vector<operation_detail> wallet_api::stealth_history(string stealth_address, int limit)
 {
-    vector<char> d = fc::from_base58(stealth_address);
-    string name(d.begin(), d.end());
-    return get_account_history(name, limit);
+    // check if we have a spending key for this address
+    boost::optional<stealth_spending_key> key;
+    for(const auto& k: my->_wallet.stealth_accs)
+    {
+        if(k.address().to_string() == stealth_address)
+        {
+            key = k;
+            break;
+        }
+    }
+    if(!key)
+        FC_THROW("No access to this stealth address history");
+    // get operations for this address
+    vector<operation_detail> result;
+    return result;
 }
 
 void wallet_api::transfer_to_stealth(string from_account_id_or_name,
