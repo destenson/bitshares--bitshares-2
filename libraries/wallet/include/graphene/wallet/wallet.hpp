@@ -195,7 +195,7 @@ struct wallet_data
    string                    ws_user;
    string                    ws_password;
 
-   vector<stealth_spending_key> stealth_accs;
+   vector<stealth_spending_key> stealth_accs; // TODO: should be encrypted
 };
 
 struct exported_account_keys

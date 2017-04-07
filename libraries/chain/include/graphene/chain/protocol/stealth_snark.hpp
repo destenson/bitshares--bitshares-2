@@ -1053,6 +1053,8 @@ struct stealth_joinsplit
 {
     static std::unique_ptr<stealth_joinsplit> generate();
     static std::unique_ptr<stealth_joinsplit> unopened();
+    static std::unique_ptr<stealth_joinsplit> init_local_verify();
+    static std::unique_ptr<stealth_joinsplit> init_local_prove();
 
     static fc::uint256 h_sig(const fc::uint256& random_seed,
                              const boost::array<fc::uint256, 2>& nullifiers,

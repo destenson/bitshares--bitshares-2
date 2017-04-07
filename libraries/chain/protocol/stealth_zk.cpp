@@ -1027,16 +1027,32 @@ struct joinsplit_impl : public stealth_joinsplit
 std::unique_ptr<stealth_joinsplit> stealth_joinsplit::generate()
 {
     joinsplit_impl::initialize();
-    joinsplit_impl* js = new joinsplit_impl();
+    std::unique_ptr<joinsplit_impl> js(new joinsplit_impl());
     js->generate_impl();
-    std::unique_ptr<stealth_joinsplit> res(js);
-    return res;
+    return std::unique_ptr<stealth_joinsplit>(js.release());
 }
 
 std::unique_ptr<stealth_joinsplit> stealth_joinsplit::unopened()
 {
     joinsplit_impl::initialize();
     return std::unique_ptr<stealth_joinsplit>(new joinsplit_impl());
+}
+
+std::unique_ptr<stealth_joinsplit> stealth_joinsplit::init_local_verify()
+{
+    joinsplit_impl::initialize();
+    std::unique_ptr<stealth_joinsplit> js(new joinsplit_impl());
+    js->load_verifying_key("verifying.key");
+    return js;
+}
+
+std::unique_ptr<stealth_joinsplit> stealth_joinsplit::init_local_prove()
+{
+    joinsplit_impl::initialize();
+    std::unique_ptr<stealth_joinsplit> js(new joinsplit_impl());
+    js->load_proving_key("proving.key");
+    js->load_verifying_key("verifying.key");
+    return js;
 }
 
 fc::uint256 stealth_joinsplit::h_sig(const fc::uint256 &random_seed,

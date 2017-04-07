@@ -1765,7 +1765,7 @@ fc::uint256 database_api::get_nullifier_anchor() const
 
 fc::uint256 database_api_impl::get_nullifier_anchor() const
 {
-    return fc::uint256();
+    return merkle_tree::empty_root();
 }
 
 
