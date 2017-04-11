@@ -662,4 +662,7 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+
+   // Stealth info
+   (get_nullifier_anchor)
 )

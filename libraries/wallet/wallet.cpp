@@ -62,6 +62,7 @@
 #include <fc/thread/scoped_lock.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/app/database_api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/utilities/git_revision.hpp>
