@@ -884,7 +884,7 @@ struct joinsplit_impl : public stealth_joinsplit
             u_int64_t vpub_new,
             const fc::uint256 &rt,
             bool compute_proof) override
-    {
+{ try {
         if (compute_proof && !pk) {
             throw std::runtime_error("JoinSplit proving key not loaded");
         }
@@ -1014,7 +1014,7 @@ struct joinsplit_impl : public stealth_joinsplit
             aux_input,
             pb.constraint_system
         ));
-    }
+    } FC_CAPTURE_AND_RETHROW( (public_key_hash)(vpub_old)(vpub_new)(rt) ) }
 
     bool is_equal(const stealth_joinsplit& other) override
     {

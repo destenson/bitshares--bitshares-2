@@ -2406,6 +2406,17 @@ public:
       return sign_transaction(tx, broadcast);
    }
 
+   vector<stealth_note> get_unspent_notes(const stealth_spending_key& sk)
+   {
+       // TODO: really decryption should be done here
+       vector<stealth_note_plaintext> trxs = _remote_db->get_unspent_notes_for_address(sk.address());
+       // TODO: filter trxes before checking notes
+       vector<stealth_note> res;
+       for(auto& trx: trxs)
+           res.push_back(trx.note(sk.address()));
+       return res;
+   }
+
    void dbg_make_uia(string creator, string symbol)
    {
       asset_options opts;
@@ -3512,7 +3523,7 @@ void wallet_api::transfer_to_stealth(string from_account_id_or_name,
    trx.validate();
    trx = sign_transaction(trx, true);
 
-} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(amount)(stealth_address) ) }
+} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(amount)(asset_symbol)(stealth_address) ) }
 
 
 
@@ -3522,6 +3533,21 @@ void wallet_api::transfer_from_stealth(string from_stealth_address,
 { try {
    FC_ASSERT( !is_locked() );
 
+   // check if we own this stealth address
+   stealth_payment_address pa(from_stealth_address);
+   boost::optional<stealth_spending_key> key;
+   for(const auto& k: my->_wallet.stealth_accs)
+   {
+       if(k.address() == pa)
+       {
+           key = k;
+           break;
+       }
+   }
+   FC_ASSERT(key, "Could not find matching key for stealth address ${addr}", ("addr", from_stealth_address));
+
+
+   std::vector<boost::optional<incremental_witness>> witnesses;
    account_object to_account = my->get_account(to_account_id_or_name);
 
    fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
@@ -3534,13 +3560,14 @@ void wallet_api::transfer_from_stealth(string from_stealth_address,
    // Funds are removed from the value pool and enter the private pool
    asset vpub_old = asset_obj->amount(0);
    asset vpub_new = total_amount;
-   stealth_payment_address pa = stealth_payment_address(from_stealth_address);
 
-   std::vector<boost::optional<incremental_witness>> witnesses;
-   fc::uint256 anchor; // TODO: get best anchor
+   fc::uint256 anchor;
+   incremental_witness witness;
+   std::vector<stealth_note> note = my->get_unspent_notes(key.get());
+   FC_ASSERT(note.size(), "No unspent assets on this address");
 
-   boost::array<stealth_input, 2> inputs ({stealth_input(), stealth_input()});
-   boost::array<stealth_output, 2> outputs({stealth_output(pa, total_amount),
+   boost::array<stealth_input, 2> inputs ({stealth_input(witness, note[0], key.get()), stealth_input()});
+   boost::array<stealth_output, 2> outputs({stealth_output(),
                                             stealth_output()});
 
    fc::ecc::private_key sk = fc::ecc::private_key::generate();

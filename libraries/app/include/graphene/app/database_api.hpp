@@ -560,6 +560,7 @@ class database_api
       //////////////////////
 
       fc::uint256 get_nullifier_anchor() const;
+      vector<stealth_note_plaintext> get_unspent_notes_for_address(const stealth_payment_address& pa) const;
    private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -665,4 +666,5 @@ FC_API(graphene::app::database_api,
 
    // Stealth info
    (get_nullifier_anchor)
+   (get_unspent_notes_for_address)
 )

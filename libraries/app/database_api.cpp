@@ -142,6 +142,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<stealth_balance_object> get_stealth_balances( const flat_set<commitment_type>& commitments )const;
       vector<stealth_nullifier_object> get_stealth_nullifiers()const;
       fc::uint256 get_nullifier_anchor() const;
+      vector<stealth_note_plaintext> get_unspent_notes_for_address(const stealth_payment_address& pa) const;
+
 
    //private:
       template<typename T>
@@ -1768,6 +1770,15 @@ fc::uint256 database_api_impl::get_nullifier_anchor() const
     return merkle_tree::empty_root();
 }
 
+vector<stealth_note_plaintext> database_api::get_unspent_notes_for_address(const stealth_payment_address& pa) const
+{
+    return my->get_unspent_notes_for_address(pa);
+}
+
+vector<stealth_note_plaintext> database_api_impl::get_unspent_notes_for_address(const stealth_payment_address& pa) const
+{
+    return vector<stealth_note_plaintext>();
+}
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //

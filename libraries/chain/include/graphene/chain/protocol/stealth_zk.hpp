@@ -56,6 +56,15 @@ struct stealth_payment_address
     stealth_payment_address(fc::uint256 pk, fc::ecc::public_key tk) :
         paying_key(pk), transmission_key(tk) {}
     std::string to_string() const;
+
+    bool operator==(const stealth_payment_address& other) const
+    {
+        return ((paying_key == other.paying_key) && (transmission_key == other.transmission_key));
+    }
+    bool operator!=(const stealth_payment_address& other) const
+    {
+        return !operator==(other);
+    }
 };
 
 struct stealth_viewing_key
