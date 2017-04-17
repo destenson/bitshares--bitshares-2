@@ -563,7 +563,7 @@ namespace graphene { namespace app {
     {
        return fc::ecc::range_get_info( proof );
     }
-        uint64_t async_type_1(const vector<std::string>& params) {
+    uint64_t async_type_1(const vector<std::string>& params) {
         int v1 = rand() % 100;
         ilog("async type 1 params ${params}", ("params", params.front()));
         ilog("async type 1 will wait for ${v1}", ("v1", v1));
