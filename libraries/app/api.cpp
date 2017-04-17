@@ -563,5 +563,55 @@ namespace graphene { namespace app {
     {
        return fc::ecc::range_get_info( proof );
     }
+        uint64_t async_type_1(const vector<std::string>& params) {
+        int v1 = rand() % 100;
+        ilog("async type 1 params ${params}", ("params", params.front()));
+        ilog("async type 1 will wait for ${v1}", ("v1", v1));
+        boost::this_thread::sleep_for(boost::chrono::seconds(v1));
+
+        ilog("type 1 Async call ending execution!");
+
+        return v1;
+    }
+    uint64_t async_type_2(const vector<std::string>& params) {
+       int v1 = rand() % 100;
+       ilog("async type 2 params ${params}", ("params", params));
+       ilog("async type 2 will wait for ${v1}", ("v1", v1));
+       boost::this_thread::sleep_for(boost::chrono::seconds(v1));
+
+       ilog("type 2 Async call ending execution!");
+
+       return v1;
+    }
+
+    uint64_t crypto_api::start_async_task(uint64_t type, const vector<std::string>& params)
+    {
+        fc::time_point ntp_now = graphene::time::now();
+        uint64_t task_id = ntp_now.time_since_epoch().count() % 1000000;
+
+        if (type == 2) {
+            auto binded = boost::bind(async_type_2, params);
+            boost::future <uint64_t> result(boost::async(binded));
+            async_tasks[task_id] = std::move(result);
+        }
+        else {
+            auto binded = boost::bind(async_type_1, params);
+            boost::future <uint64_t> result(boost::async(binded));
+            async_tasks[task_id] = std::move(result);
+        }
+        return task_id;
+    }
+    uint64_t crypto_api::check_async_task(uint64_t id)
+    {
+        boost::future_status status;
+        status = async_tasks[id].wait_for(boost::chrono::seconds(0));
+        if (status == boost::future_status::deferred) {
+            return 0;
+        } else if (status == boost::future_status::timeout) {
+            return 0;
+        } else if (status == boost::future_status::ready) {
+            return async_tasks[id].get();
+        }
+    }
 
 } } // graphene::app
