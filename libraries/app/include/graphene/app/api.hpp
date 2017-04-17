@@ -46,6 +46,12 @@
 #include <string>
 #include <vector>
 
+#define BOOST_THREAD_PROVIDES_FUTURE
+#include <boost/thread.hpp>
+#include <boost/thread/future.hpp>
+#include <boost/chrono.hpp>
+#include <graphene/time/time.hpp>
+
 namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
