@@ -250,6 +250,15 @@ namespace graphene { namespace app {
          
                                          
          range_proof_info range_get_info( const std::vector<char>& proof );
+      
+         map<uint64_t,boost::future<uint64_t>> async_tasks;
+         // task_id - some id for async task to check its status later
+         // task_type - some element from the predefined hardcoded list of tasks that can be executed asyncronously
+         // task_params - array of the task parameters in most arbitrary form
+         uint64_t start_async_task(uint64_t type, const vector<std::string>& params);
+         // task_status - contains current task task execution status (waiting,  ready,  cancelled) and task execution result in most arbitrary form
+         // task id - async task identifer  that we got in  start_async_task
+         uint64_t check_async_task(uint64_t id);
    };
 
    /**
