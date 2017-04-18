@@ -355,6 +355,8 @@ FC_API(graphene::app::crypto_api,
        (range_proof_sign)
        (verify_range_proof_rewind)
        (range_get_info)
+       (start_async_task)
+       (check_async_task)
      )
 FC_API(graphene::app::login_api,
        (login)
